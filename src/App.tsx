@@ -331,11 +331,16 @@ export default function App() {
 
   const generateImage = async (prompt: string) => {
     try {
-      const freshAi = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || process.env.API_KEY || '' });
+      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
+      const freshAi = new GoogleGenAI({ apiKey });
       const response = await freshAi.models.generateContent({
-        model: 'gemini-2.5-flash-image',
+        model: 'gemini-3.1-flash-image-preview',
         contents: { parts: [{ text: prompt + (isPlusActive ? " (High quality 2K resolution, extremely detailed, professional lighting, photorealistic)" : "") }] },
         config: {
+          imageConfig: {
+            aspectRatio: "1:1",
+            imageSize: isPlusActive ? "2K" : "1K"
+          },
           systemInstruction: "Sadece istenen görseli oluştur. Asla metin yanıtı verme. Sadece görsel verisini döndür."
         }
       });
@@ -444,12 +449,23 @@ export default function App() {
       }
 
       setMessages(prev => [...prev, assistantMessage]);
-    } catch (error) {
+    } catch (error: any) {
       console.error("AI Error:", error);
+      let errorMessage = "Lütfen tekrar deneyin.";
+      
+      const errorStr = JSON.stringify(error);
+      if (errorStr.includes("429") || errorStr.includes("QUOTA_EXCEEDED") || errorStr.includes("RESOURCE_EXHAUSTED")) {
+        errorMessage = "Günlük veya dakikalık kullanım kotanız doldu. Lütfen bir süre bekleyip tekrar deneyin veya farklı bir API anahtarı kullanın.";
+      } else if (errorStr.includes("API key not valid")) {
+        errorMessage = "API anahtarınız geçersiz. Lütfen Vercel ayarlarından GEMINI_API_KEY değişkenini kontrol edin.";
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: `Hata: İşlem gerçekleştirilemedi. ${error instanceof Error ? error.message : 'Lütfen tekrar deneyin.'}`,
+        content: `Hata: ${errorMessage}`,
         timestamp: Date.now(),
       }]);
     } finally {
