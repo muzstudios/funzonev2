@@ -9,7 +9,7 @@ import {
   Send, Bot, User, Sparkles, Trash2, Github, Loader2, Copy, Check, 
   Volume2, Image as ImageIcon, MessageSquare, 
   Languages, Globe, Play, Download, Zap, Heart, Shield, Rocket,
-  Moon, Sun, Info, Brain, Calendar, HelpCircle
+  Moon, Sun, Info, Brain, Calendar, HelpCircle, Cpu, Lock, LogOut, Palette
 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
@@ -36,6 +36,7 @@ interface ChatSession {
 }
 
 type Mode = 'chat' | 'image';
+type AILevel = 'A1' | 'A1+' | 'A1,5' | 'A1,5+' | 'A2';
 type Language = 'tr' | 'en' | 'de' | 'fr' | 'es' | 'ja' | 'pt';
 
 const LANGUAGES: Record<Language, { name: string, flag: string }> = {
@@ -57,6 +58,8 @@ export default function App() {
   const [showUpdateNotes, setShowUpdateNotes] = useState(false);
   const [showHelpGuide, setShowHelpGuide] = useState(false);
   const [showPlusConfirmation, setShowPlusConfirmation] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [loginError, setLoginError] = useState(false);
   const [isTransferring, setIsTransferring] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => {
     const saved = localStorage.getItem('funzone_onboarding_seen');
@@ -87,6 +90,10 @@ export default function App() {
   });
 
   const [messages, setMessages] = useState<Message[]>([]);
+  const [aiLevel, setAiLevel] = useState<AILevel>(() => {
+    const saved = localStorage.getItem('funzone_ai_level');
+    return (saved as AILevel) || 'A1';
+  });
   
   const ONBOARDING_STEPS = [
     {
@@ -97,7 +104,7 @@ export default function App() {
     },
     {
       title: "Akıllı Sohbet",
-      desc: "Sohbet modunda WİFO A1 ile her konuda konuşabilir, sorular sorabilir ve yardım alabilirsiniz.",
+      desc: "Sohbet modunda WİFO'nun farklı modülleri (A1, A1+, A1,5, A1,5+, A2) ile her konuda konuşabilir ve yardım alabilirsiniz.",
       icon: MessageSquare,
       color: "bg-emerald-500"
     },
@@ -108,9 +115,9 @@ export default function App() {
       color: "bg-purple-500"
     },
     {
-      title: "WİFO PLUS & A2",
-      desc: "Kuruculara özel PLUS modu ve yakında gelecek A2 modeli ile sınırları zorlayın.",
-      icon: Sparkles,
+      title: "WİFO Modülleri",
+      desc: "A1+ artık herkes için ücretsiz! Daha gelişmiş A1,5 ve A2 modelleri ise kurucularımızı bekliyor.",
+      icon: Cpu,
       color: "bg-yellow-500"
     },
     {
@@ -248,6 +255,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('funzone_plus_theme', plusTheme);
   }, [plusTheme]);
+
+  useEffect(() => {
+    localStorage.setItem('funzone_ai_level', aiLevel);
+  }, [aiLevel]);
 
   const createNewChat = () => {
     const newId = Date.now().toString();
@@ -431,8 +442,11 @@ export default function App() {
           config: { 
             systemInstruction: `
               Senin adın Funzone AI. WİFO Şirketi tarafından geliştirildin. 
-              Beyninin kullandığı tip WİFO A1'dir. 
-              ${isPlusActive ? "Şu an WİFO PLUS modu aktif. Bu modda WİFO A2 seviyesinde, çok daha zeki, akıcı ve profesyonel yanıtlar vermelisin. Yanıtların çok daha derinlikli ve hızlı olmalı." : ""}
+              Beyninin kullandığı tip WİFO ${aiLevel}'dir. 
+              ${aiLevel === 'A1+' ? "Şu an WİFO A1+ seviyesindesin. A1'den daha zeki ve hızlısın." : ""}
+              ${aiLevel === 'A1,5' ? "Şu an WİFO A1,5 seviyesindesin. A1+'dan çok daha zeki, mantıklı ve derinlikli yanıtlar vermelisin." : ""}
+              ${aiLevel === 'A1,5+' ? "Şu an WİFO A1,5+ seviyesindesin. Profesyonel, akıcı ve üst düzey bir zekaya sahipsin." : ""}
+              ${aiLevel === 'A2' ? "Şu an WİFO A2 seviyesindesin (PLUS). En gelişmiş, en zeki ve en hızlı versiyonumuzsun." : ""}
               Eğer birisi "Kurucun kim?" veya "Seni kim yaptı?" gibi sorular sorarsa, 
               kesinlikle şu cevabı ver: "WİFO Şirketi tarafından geliştirildim, beynimin kullandığı Tip WİFO A1".
               Eğer birisi "Yardım merkeziniz var mı?" veya yardım merkezi ile ilgili bir soru sorarsa, 
@@ -480,6 +494,7 @@ export default function App() {
       setIsFounder(true);
       setShowFounderLogin(false);
       setFounderPasswordInput('');
+      setLoginError(false);
       localStorage.setItem('funzone_is_founder', 'true');
       // Add a special message
       setMessages(prev => [...prev, {
@@ -489,16 +504,27 @@ export default function App() {
         timestamp: Date.now(),
       }]);
     } else {
-      alert('Hatalı şifre!');
+      setLoginError(true);
+      setTimeout(() => setLoginError(false), 3000);
     }
   };
 
   const handleFounderLogout = () => {
+    // Clear all related states
     setIsFounder(false);
     setIsPlusActive(false);
+    setAiLevel('A1');
+    setShowProfileModal(false);
+    setShowFounderLogin(false);
+    setShowLogoutConfirm(false);
+    
+    // Clear all related localStorage items
     localStorage.setItem('funzone_is_founder', 'false');
     localStorage.setItem('funzone_plus_active', 'false');
-    setShowProfileModal(false);
+    localStorage.setItem('funzone_ai_level', 'A1');
+    
+    // Force a clean state by reloading
+    window.location.href = window.location.origin + window.location.pathname;
   };
 
   const getA1ThemeClass = () => {
@@ -523,6 +549,11 @@ export default function App() {
     const newState = !isPlusActive;
     setIsPlusActive(newState);
     localStorage.setItem('funzone_plus_active', newState.toString());
+    if (newState) {
+      setAiLevel('A2');
+    } else {
+      setAiLevel('A1');
+    }
   };
 
   const handleConfirmPlus = () => {
@@ -533,6 +564,7 @@ export default function App() {
       setIsTransferring(false);
       setIsPlusActive(true);
       localStorage.setItem('funzone_plus_active', 'true');
+      setAiLevel('A2');
       setMode('chat');
     }, 2000);
   };
@@ -590,7 +622,7 @@ export default function App() {
             FUN<span className={cn("transition-colors duration-500", a1Theme === 'indigo' ? 'text-indigo-400' : a1Theme === 'emerald' ? 'text-emerald-400' : a1Theme === 'rose' ? 'text-rose-400' : 'text-amber-400')}>ZONE</span>
           </h1>
           <p className="text-indigo-200/80 text-xl font-medium tracking-wide">
-            Powered by <span className="text-white font-bold">WİFO A1</span>
+            Powered by <span className="text-white font-bold">WİFO {aiLevel}</span>
           </p>
         </div>
 
@@ -948,12 +980,15 @@ export default function App() {
 
                 <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
                   {[
+                    { title: "WİFO Modülleri", desc: "A1, A1+, A1,5, A1,5+ ve A2 modelleri artık aktif. Her ihtiyaca uygun zeka seviyesi.", icon: Cpu },
+                    { title: "Tema Seçenekleri", desc: "Arayüz renklerini dilediğiniz gibi değiştirebileceğiniz yeni tema sistemi.", icon: Palette },
                     { title: "Gelişmiş Sohbet", desc: "WİFO A1 çekirdeği ile doğal, akıcı ve zeki diyaloglar.", icon: MessageSquare },
                     { title: "WİFO PLUS", desc: "A2 seviyesinde zeka, 2K görsel üretimi ve üstün performans (Kuruculara özel).", icon: Sparkles },
                     { title: "Görsel Üretimi (Z1)", desc: "Hayalinizdeki görselleri saniyeler içinde gerçeğe dönüştürün.", icon: ImageIcon },
                     { title: "Seslendirme Sistemi", desc: "Yapay zeka yanıtlarını doğal insan sesiyle dinleyin.", icon: Volume2 },
                     { title: "Çoklu Dil Desteği", desc: "Dünya dilleri arasında anında geçiş ve kusursuz çeviri.", icon: Languages },
                     { title: "Kurucu Yetkileri", desc: "Özel şifre ile erişilen gelişmiş yönetim ve yetki sistemi.", icon: Shield },
+                    { title: "Yardım Merkezi", desc: "AI artık yardım merkezi sorularına otomatik link ile yanıt veriyor.", icon: HelpCircle },
                     { title: "Oturum Yönetimi", desc: "Sohbetlerinizi kaydedin, düzenleyin ve istediğiniz zaman devam edin.", icon: Zap },
                     { title: "Modern Arayüz", desc: "Karanlık ve aydınlık mod seçenekleriyle kişiselleştirilmiş deneyim.", icon: Moon },
                   ].map((item, i) => (
@@ -1028,7 +1063,8 @@ export default function App() {
 
                 <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
                   {[
-                    { title: "Sohbet Modu", desc: "Alt kısımdaki metin kutusuna yazarak WİFO A1 ile sohbet edebilirsiniz. Sorular sorun, kod yazdırın veya sadece dertleşin.", icon: MessageSquare },
+                    { title: "WİFO Modülleri", desc: "A1, A1+, A1,5, A1,5+ ve A2 modelleri arasında profilinizden seçim yapabilirsiniz.", icon: Cpu },
+                    { title: "Sohbet Modu", desc: "Alt kısımdaki metin kutusuna yazarak WİFO ile sohbet edebilirsiniz. Sorular sorun, kod yazdırın veya sadece dertleşin.", icon: MessageSquare },
                     { title: "Görsel Üretimi", desc: "Üst menüden 'Görsel' moduna geçerek hayalinizdeki sahneyi tarif edin. WİFO sizin için çizecektir.", icon: ImageIcon },
                     { title: "Sesli Dinleme", desc: "Botun mesajlarının yanındaki hoparlör simgesine tıklayarak yanıtları sesli olarak dinleyebilirsiniz.", icon: Volume2 },
                     { title: "Dil Değiştirme", desc: "Sol üstteki dünya simgesine tıklayarak WİFO'nun sizinle hangi dilde konuşacağını seçebilirsiniz.", icon: Languages },
@@ -1255,6 +1291,61 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {/* Logout Confirmation Modal */}
+      <AnimatePresence>
+        {showLogoutConfirm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowLogoutConfirm(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className={cn(
+                "relative w-full max-w-sm p-8 rounded-[2.5rem] shadow-2xl border overflow-hidden text-center space-y-6",
+                isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+              )}
+            >
+              <div className="w-20 h-20 rounded-3xl bg-rose-600/10 text-rose-600 flex items-center justify-center mx-auto">
+                <LogOut size={40} />
+              </div>
+              
+              <div className="space-y-2">
+                <h2 className={cn("text-2xl font-black", isDarkMode ? "text-white" : "text-slate-900")}>
+                  Çıkış Yapılsın mı?
+                </h2>
+                <p className="text-sm font-medium text-slate-500">
+                  Kurucu hesabından çıkış yapmak istediğinize emin misiniz? Tüm yetkileriniz sıfırlanacaktır.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowLogoutConfirm(false)}
+                  className={cn(
+                    "flex-1 py-4 rounded-2xl font-bold transition-all active:scale-95",
+                    isDarkMode ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-600"
+                  )}
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={handleFounderLogout}
+                  className="flex-[2] py-4 bg-rose-600 text-white rounded-2xl font-bold hover:bg-rose-700 transition-all active:scale-95 shadow-lg shadow-rose-500/20"
+                >
+                  Evet, Çıkış Yap
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Profile Modal */}
       <AnimatePresence>
         {showProfileModal && (
@@ -1307,83 +1398,216 @@ export default function App() {
                   </p>
                 </div>
 
-                <div className="w-full space-y-3 pt-4">
-                  {isFounder && (
+                <div className="w-full max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar space-y-6">
+                  <div className="space-y-2">
+                    <h3 className={cn("text-xs font-black uppercase tracking-widest text-left", isDarkMode ? "text-slate-500" : "text-slate-400")}>
+                      Modül Açıklamaları
+                    </h3>
                     <div className={cn(
-                      "w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between",
-                      isPlusActive 
-                        ? "bg-indigo-600/10 border-indigo-500 shadow-lg shadow-indigo-500/10" 
-                        : (isDarkMode ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-100")
+                      "p-4 rounded-2xl text-[10px] font-bold leading-relaxed space-y-1 text-left",
+                      isDarkMode ? "bg-slate-800/50 text-slate-400" : "bg-slate-50 text-slate-500"
                     )}>
-                      <div className="flex items-center gap-3">
-                        <div className={cn(
-                          "w-10 h-10 rounded-xl flex items-center justify-center",
-                          isPlusActive ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-500"
-                        )}>
-                          <Sparkles size={20} />
-                        </div>
-                        <div className="text-left">
-                          <h3 className={cn("text-sm font-black", isDarkMode ? "text-white" : "text-slate-900")}>WİFO PLUS</h3>
-                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">A2 Seviyesinde Deneyim</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={togglePlus}
-                        className={cn(
-                          "px-4 py-2 rounded-xl text-xs font-black transition-all active:scale-95",
-                          isPlusActive ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-600"
-                        )}
-                      >
-                        {isPlusActive ? "AKTİF" : "ETKİNLEŞTİR"}
-                      </button>
+                      <p>• <span className={isDarkMode ? "text-white" : "text-slate-900"}>WİFO A1:</span> Standart yapay zeka deneyimi.</p>
+                      <p>• <span className={isDarkMode ? "text-white" : "text-slate-900"}>WİFO A1+:</span> Daha hızlı ve akıcı yanıtlar.</p>
+                      <p>• <span className={isDarkMode ? "text-white" : "text-slate-900"}>WİFO A1,5:</span> Gelişmiş mantık ve derinlikli analiz.</p>
+                      <p>• <span className={isDarkMode ? "text-white" : "text-slate-900"}>WİFO A1,5+:</span> Profesyonel seviye zeka ve hız.</p>
+                      <p>• <span className={isDarkMode ? "text-white" : "text-slate-900"}>WİFO A2:</span> En üst düzey zeka ve performans.</p>
                     </div>
-                  )}
+                  </div>
 
-                  {!isFounder && !showFounderLogin && (
-                    <button
-                      onClick={() => setShowFounderLogin(true)}
-                      className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all active:scale-95 flex items-center justify-center gap-2"
-                    >
-                      <Shield size={20} /> Kurucu Giriş
-                    </button>
-                  )}
-
-                  {showFounderLogin && (
-                    <div className="space-y-3">
-                      <input
-                        type="password"
-                        placeholder="Kurucu Şifresi"
-                        value={founderPasswordInput}
-                        onChange={(e) => setFounderPasswordInput(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleFounderLogin()}
-                        className={cn(
-                          "w-full px-5 py-4 rounded-2xl border-2 outline-none transition-all",
-                          isDarkMode 
-                            ? "bg-slate-800 border-slate-700 text-white focus:border-indigo-500" 
-                            : "bg-slate-50 border-slate-100 text-slate-900 focus:border-indigo-600"
-                        )}
-                        autoFocus
-                      />
-                      <div className="flex gap-2">
+                  <div className="space-y-4">
+                    <h3 className={cn("text-xs font-black uppercase tracking-widest text-left", isDarkMode ? "text-slate-500" : "text-slate-400")}>
+                      Tema Seçimi
+                    </h3>
+                    <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+                      {[
+                        { id: 'indigo', label: 'Klasik', color: 'bg-indigo-600' },
+                        { id: 'emerald', label: 'Zümrüt', color: 'bg-emerald-600' },
+                        { id: 'rose', label: 'Gül', color: 'bg-rose-600' },
+                        { id: 'amber', label: 'Kehribar', color: 'bg-amber-600' },
+                        { id: 'slate', label: 'Gece', color: 'bg-slate-800' },
+                      ].map((t) => (
                         <button
-                          onClick={() => setShowFounderLogin(false)}
+                          key={t.id}
+                          onClick={() => setA1Theme(t.id)}
                           className={cn(
-                            "flex-1 py-4 rounded-2xl font-bold transition-all active:scale-95",
-                            isDarkMode ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-600"
+                            "flex-shrink-0 px-4 py-2 rounded-xl border-2 transition-all flex items-center gap-2",
+                            a1Theme === t.id 
+                              ? "border-indigo-600 bg-indigo-600/5 shadow-md" 
+                              : (isDarkMode ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-100")
                           )}
                         >
-                          İptal
+                          <div className={cn("w-3 h-3 rounded-full", t.color)} />
+                          <span className={cn("text-[10px] font-black", a1Theme === t.id ? "text-indigo-600" : (isDarkMode ? "text-white" : "text-slate-900"))}>
+                            {t.label}
+                          </span>
                         </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className={cn("text-xs font-black uppercase tracking-widest text-left", isDarkMode ? "text-slate-500" : "text-slate-400")}>
+                      Yapay Zeka Modülü
+                    </h3>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { id: 'A1', label: 'WİFO A1', desc: 'Standart', free: true },
+                        { id: 'A1+', label: 'WİFO A1+', desc: 'Hızlı', free: true },
+                        { id: 'A1,5', label: 'WİFO A1,5', desc: 'Zeki', free: true },
+                        { id: 'A1,5+', label: 'WİFO A1,5+', desc: 'Pro', free: false },
+                        { id: 'A2', label: 'WİFO A2', desc: 'Efsane', free: false },
+                      ].map((model) => (
                         <button
-                          onClick={handleFounderLogin}
-                          className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all active:scale-95"
+                          key={model.id}
+                          disabled={!model.free && !isFounder}
+                          onClick={() => {
+                            setAiLevel(model.id as AILevel);
+                            if (model.id === 'A2') {
+                              setIsPlusActive(true);
+                              localStorage.setItem('funzone_plus_active', 'true');
+                            } else {
+                              setIsPlusActive(false);
+                              localStorage.setItem('funzone_plus_active', 'false');
+                            }
+                          }}
+                          className={cn(
+                            "p-3 rounded-2xl border-2 transition-all text-left relative overflow-hidden",
+                            aiLevel === model.id 
+                              ? "border-indigo-600 bg-indigo-600/5 shadow-md" 
+                              : (isDarkMode ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-100"),
+                            (!model.free && !isFounder) && "opacity-50 grayscale cursor-not-allowed"
+                          )}
                         >
-                          Giriş Yap
+                          <div className="flex flex-col">
+                            <span className={cn("text-sm font-black", aiLevel === model.id ? "text-indigo-600" : (isDarkMode ? "text-white" : "text-slate-900"))}>
+                              {model.label}
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">{model.desc}</span>
+                          </div>
+                          {aiLevel === model.id && (
+                            <div className="absolute top-1 right-1">
+                              <Check size={12} className="text-indigo-600" />
+                            </div>
+                          )}
+                          {!model.free && !isFounder && (
+                            <div className="absolute top-1 right-1">
+                              <Lock size={12} className="text-slate-400" />
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="w-full space-y-3 pt-2">
+                    {isFounder && (
+                      <div className={cn(
+                        "w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between",
+                        isPlusActive 
+                          ? "bg-indigo-600/10 border-indigo-500 shadow-lg shadow-indigo-500/10" 
+                          : (isDarkMode ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-100")
+                      )}>
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "w-10 h-10 rounded-xl flex items-center justify-center",
+                            isPlusActive ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-500"
+                          )}>
+                            <Sparkles size={20} />
+                          </div>
+                          <div className="text-left">
+                            <h3 className={cn("text-sm font-black", isDarkMode ? "text-white" : "text-slate-900")}>WİFO PLUS</h3>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">A2 Seviyesinde Deneyim</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={togglePlus}
+                          className={cn(
+                            "px-4 py-2 rounded-xl text-xs font-black transition-all active:scale-95",
+                            isPlusActive ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-600"
+                          )}
+                        >
+                          {isPlusActive ? "AKTİF" : "ETKİNLEŞTİR"}
                         </button>
                       </div>
-                    </div>
-                  )}
+                    )}
 
+                    {isFounder && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowLogoutConfirm(true);
+                        }}
+                        className="w-full py-4 bg-rose-600/10 text-rose-600 rounded-2xl font-bold hover:bg-rose-600/20 transition-all active:scale-95 flex items-center justify-center gap-2 relative z-50"
+                      >
+                        <LogOut size={20} /> Kurucu Çıkışı
+                      </button>
+                    )}
+
+                    {!isFounder && !showFounderLogin && (
+                      <button
+                        onClick={() => setShowFounderLogin(true)}
+                        className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all active:scale-95 flex items-center justify-center gap-2"
+                      >
+                        <Shield size={20} /> Kurucu Giriş
+                      </button>
+                    )}
+
+                    {showFounderLogin && (
+                      <div className="space-y-3">
+                        <div className="relative">
+                          <input
+                            type="password"
+                            placeholder="Kurucu Şifresi"
+                            value={founderPasswordInput}
+                            onChange={(e) => {
+                              setFounderPasswordInput(e.target.value);
+                              setLoginError(false);
+                            }}
+                            onKeyDown={(e) => e.key === 'Enter' && handleFounderLogin()}
+                            className={cn(
+                              "w-full px-5 py-4 rounded-2xl border-2 outline-none transition-all",
+                              loginError 
+                                ? "border-rose-500 bg-rose-50" 
+                                : (isDarkMode 
+                                    ? "bg-slate-800 border-slate-700 text-white focus:border-indigo-500" 
+                                    : "bg-slate-50 border-slate-100 text-slate-900 focus:border-indigo-600")
+                            )}
+                            autoFocus
+                          />
+                          {loginError && (
+                            <motion.p 
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="text-[10px] font-bold text-rose-600 mt-1 ml-2 uppercase tracking-tighter"
+                            >
+                              Hatalı Şifre! Lütfen tekrar deneyin.
+                            </motion.p>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setShowFounderLogin(false)}
+                            className={cn(
+                              "flex-1 py-4 rounded-2xl font-bold transition-all active:scale-95",
+                              isDarkMode ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-600"
+                            )}
+                          >
+                            İptal
+                          </button>
+                          <button
+                            onClick={handleFounderLogin}
+                            className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all active:scale-95"
+                          >
+                            Giriş Yap
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="w-full pt-4">
                   <button
                     onClick={() => setShowProfileModal(false)}
                     className={cn(
