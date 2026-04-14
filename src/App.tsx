@@ -9,7 +9,7 @@ import {
   Send, Bot, User, Sparkles, Trash2, Github, Loader2, Copy, Check, 
   Volume2, Image as ImageIcon, MessageSquare, 
   Languages, Globe, Play, Download, Zap, Heart, Shield, Rocket,
-  Moon, Sun, Info, Brain, Calendar, HelpCircle, Cpu, Lock, LogOut, Palette
+  Moon, Sun, Info, Brain, Calendar, HelpCircle, Cpu, Lock, LogOut, Palette, FileUp, ExternalLink, AlertCircle, Building2
 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
@@ -35,7 +35,7 @@ interface ChatSession {
   timestamp: number;
 }
 
-type Mode = 'chat' | 'image';
+type Mode = 'chat' | 'image' | 'upload';
 type AILevel = 'A1' | 'A1+' | 'A1,5' | 'A1,5+' | 'A2';
 type Language = 'tr' | 'en' | 'de' | 'fr' | 'es' | 'ja' | 'pt';
 
@@ -61,10 +61,7 @@ export default function App() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [loginError, setLoginError] = useState(false);
   const [isTransferring, setIsTransferring] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(() => {
-    const saved = localStorage.getItem('funzone_onboarding_seen');
-    return saved !== 'true';
-  });
+  const [showOnboarding, setShowOnboarding] = useState(true);
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [isPlusActive, setIsPlusActive] = useState(() => {
     const saved = localStorage.getItem('funzone_plus_active');
@@ -90,6 +87,12 @@ export default function App() {
   });
 
   const [messages, setMessages] = useState<Message[]>([]);
+  
+  const getAiInstance = () => {
+    const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || '';
+    return new GoogleGenAI({ apiKey });
+  };
+
   const [aiLevel, setAiLevel] = useState<AILevel>(() => {
     const saved = localStorage.getItem('funzone_ai_level');
     return (saved as AILevel) || 'A1';
@@ -412,9 +415,9 @@ export default function App() {
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: userQuery,
+      content: mode === 'upload' ? `Dosya yüklendi: ${userQuery}` : userQuery,
       timestamp: Date.now(),
-      type: mode === 'chat' ? 'text' : 'image'
+      type: mode === 'chat' ? 'text' : mode === 'image' ? 'image' : 'text'
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -422,9 +425,7 @@ export default function App() {
     setIsLoading(true);
 
     try {
-      // Use process.env.API_KEY if available (user selected key), otherwise fallback to GEMINI_API_KEY
-      const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || '';
-      const freshAi = new GoogleGenAI({ apiKey });
+      const freshAi = getAiInstance();
       
       let assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -432,10 +433,18 @@ export default function App() {
         content: '',
         timestamp: Date.now(),
         type: 'text',
-        botName: mode === 'image' ? 'Z1' : 'Funzone AI'
+        botName: mode === 'image' ? 'Z1' : mode === 'upload' ? 'Analizör' : 'Funzone AI'
       };
 
-      if (mode === 'chat') {
+      setMessages(prev => [...prev, assistantMessage]);
+
+      let fullContent = "";
+
+      if (mode === 'upload') {
+        // Simulate file analysis
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        fullContent = "Dosya başarıyla yüklendi ve analiz edildi. İçerik hakkında ne bilmek istersiniz? (Not: Şu an simülasyon modundadır)";
+      } else if (mode === 'chat') {
         const response = await freshAi.models.generateContent({
           model: "gemini-3-flash-preview",
           contents: userQuery,
@@ -443,12 +452,15 @@ export default function App() {
             systemInstruction: `
               Senin adın Funzone AI. WİFO Şirketi tarafından geliştirildin. 
               Beyninin kullandığı tip WİFO ${aiLevel}'dir. 
+              Yanıtlarında doğal ve samimi bir dil kullan, cümlelerinin sonuna veya uygun yerlerine mutlaka ilgili emojiler ekle (Örn: 😊, 🚀, 🤖, ✨).
               ${aiLevel === 'A1+' ? "Şu an WİFO A1+ seviyesindesin. A1'den daha zeki ve hızlısın." : ""}
               ${aiLevel === 'A1,5' ? "Şu an WİFO A1,5 seviyesindesin. A1+'dan çok daha zeki, mantıklı ve derinlikli yanıtlar vermelisin." : ""}
               ${aiLevel === 'A1,5+' ? "Şu an WİFO A1,5+ seviyesindesin. Profesyonel, akıcı ve üst düzey bir zekaya sahipsin." : ""}
               ${aiLevel === 'A2' ? "Şu an WİFO A2 seviyesindesin (PLUS). En gelişmiş, en zeki ve en hızlı versiyonumuzsun." : ""}
               Eğer birisi "Kurucun kim?" veya "Seni kim yaptı?" gibi sorular sorarsa, 
               kesinlikle şu cevabı ver: "WİFO Şirketi tarafından geliştirildim, beynimin kullandığı Tip WİFO A1".
+              Eğer birisi "Sponsorun var mı?" veya sponsorlarla ilgili bir soru sorarsa,
+              şu sponsorları say: WİFO, FE, MUZ FC, FUNZONE AI, Sequel Studio.
               Eğer birisi "Yardım merkeziniz var mı?" veya yardım merkezi ile ilgili bir soru sorarsa, 
               şu linki paylaş: https://feyardimmerkezi.netlify.app
               Yanıtlarını ${LANGUAGES[language].name} dilinde ver.
@@ -456,15 +468,35 @@ export default function App() {
             ` 
           }
         });
-        assistantMessage.content = response.text || "Üzgünüm, yanıt oluşturulamadı.";
+        fullContent = response.text || "Üzgünüm, yanıt oluşturulamadı.";
       } else if (mode === 'image') {
         const imageUrl = await generateImage(userQuery);
-        assistantMessage.type = 'image';
-        assistantMessage.mediaUrl = imageUrl;
-        assistantMessage.content = userQuery;
+        setMessages(prev => prev.map(msg => 
+          msg.id === assistantMessage.id 
+            ? { ...msg, type: 'image', mediaUrl: imageUrl, content: userQuery }
+            : msg
+        ));
+        setIsLoading(false);
+        return;
       }
 
-      setMessages(prev => [...prev, assistantMessage]);
+      // Hide loader as soon as we have content
+      setIsLoading(false);
+
+      // Fast typing effect
+      const chunks = fullContent.split('');
+      let currentText = "";
+      // Process in small batches for performance and speed
+      const batchSize = 3; 
+      for (let i = 0; i < chunks.length; i += batchSize) {
+        currentText += chunks.slice(i, i + batchSize).join('');
+        setMessages(prev => prev.map(msg => 
+          msg.id === assistantMessage.id ? { ...msg, content: currentText } : msg
+        ));
+        // Very short delay for a "fast but smooth" feel
+        await new Promise(resolve => setTimeout(resolve, 5));
+      }
+
     } catch (error: any) {
       console.error("AI Error:", error);
       let errorMessage = "Lütfen tekrar deneyin.";
@@ -604,11 +636,15 @@ export default function App() {
               ease: "easeInOut"
             }}
             className={cn(
-              "w-32 h-32 rounded-[2.5rem] flex items-center justify-center shadow-[0_0_50px_rgba(79,70,229,0.4)] mx-auto transition-all duration-500",
+              "w-32 h-32 rounded-[2.5rem] flex items-center justify-center shadow-[0_0_50px_rgba(79,70,229,0.4)] mx-auto transition-all duration-500 overflow-hidden",
               getA1ThemeClass()
             )}
           >
-            <Rocket className="text-white w-16 h-16" />
+            {localStorage.getItem('funzone_custom_icon') ? (
+              <img src={localStorage.getItem('funzone_custom_icon')!} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            ) : (
+              <Rocket className="text-white w-16 h-16" />
+            )}
           </motion.div>
           <motion.div 
             animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] }}
@@ -618,7 +654,7 @@ export default function App() {
         </div>
 
         <div className="space-y-4">
-          <h1 className="text-7xl font-black text-white tracking-tighter italic">
+          <h1 className="text-7xl font-black text-white tracking-tighter italic flex items-center justify-center gap-4">
             FUN<span className={cn("transition-colors duration-500", a1Theme === 'indigo' ? 'text-indigo-400' : a1Theme === 'emerald' ? 'text-emerald-400' : a1Theme === 'rose' ? 'text-rose-400' : 'text-amber-400')}>ZONE</span>
           </h1>
           <p className="text-indigo-200/80 text-xl font-medium tracking-wide">
@@ -779,15 +815,19 @@ export default function App() {
             transition={{ duration: 0.5 }}
             onClick={() => setShowLanding(true)}
             className={cn(
-              "w-10 h-10 rounded-xl flex items-center justify-center shadow-lg cursor-pointer transition-all duration-500",
+              "w-10 h-10 rounded-xl flex items-center justify-center shadow-lg cursor-pointer transition-all duration-500 overflow-hidden",
               isPlusActive ? "bg-gradient-to-br " + getPlusThemeClass() + " shadow-indigo-500/30" : getA1ThemeClass() + " shadow-indigo-500/30"
             )}
           >
-            <Rocket className="text-white w-6 h-6" />
+            {localStorage.getItem('funzone_custom_icon') ? (
+              <img src={localStorage.getItem('funzone_custom_icon')!} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            ) : (
+              <Rocket className="text-white w-6 h-6" />
+            )}
           </motion.div>
           <div className="hidden sm:block">
             <h1 className={cn(
-              "text-lg font-black tracking-tighter italic flex items-center",
+              "text-lg font-black tracking-tighter italic flex items-center gap-1",
               isDarkMode ? "text-white" : "text-slate-900"
             )}>
               FUN<span className={cn("transition-colors duration-500", isPlusActive ? "text-indigo-400" : a1Theme === 'indigo' ? 'text-indigo-600' : a1Theme === 'emerald' ? 'text-emerald-600' : a1Theme === 'rose' ? 'text-rose-600' : 'text-amber-600')}>ZONE</span>
@@ -1256,9 +1296,13 @@ export default function App() {
                 repeat: Infinity,
                 ease: "easeInOut"
               }}
-              className="w-24 h-24 rounded-[2rem] bg-white/20 backdrop-blur-xl flex items-center justify-center border border-white/30"
+              className="w-24 h-24 rounded-[2rem] bg-white/20 backdrop-blur-xl flex items-center justify-center border border-white/30 overflow-hidden"
             >
-              <Rocket size={48} className="text-white" />
+              {localStorage.getItem('funzone_custom_icon') ? (
+                <img src={localStorage.getItem('funzone_custom_icon')!} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <Rocket size={48} className="text-white" />
+              )}
             </motion.div>
             <div className="text-center space-y-2">
               <motion.h2 
@@ -1417,6 +1461,27 @@ export default function App() {
 
                   <div className="space-y-4">
                     <h3 className={cn("text-xs font-black uppercase tracking-widest text-left", isDarkMode ? "text-slate-500" : "text-slate-400")}>
+                      Sponsorlar
+                    </h3>
+                    <div className={cn(
+                      "p-4 rounded-2xl border-2 grid grid-cols-2 gap-3",
+                      isDarkMode ? "bg-slate-800/50 border-slate-700" : "bg-slate-50 border-slate-100"
+                    )}>
+                      {[
+                        "WİFO", "FE", "MUZ FC", "FUNZONE AI", "Sequel Studio"
+                      ].map((sponsor, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                          <span className={cn("text-[10px] font-black uppercase tracking-tighter", isDarkMode ? "text-slate-300" : "text-slate-600")}>
+                            {sponsor}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className={cn("text-xs font-black uppercase tracking-widest text-left", isDarkMode ? "text-slate-500" : "text-slate-400")}>
                       Tema Seçimi
                     </h3>
                     <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
@@ -1500,6 +1565,53 @@ export default function App() {
                     </div>
                   </div>
 
+                  <div className="space-y-4">
+                    <h3 className={cn("text-xs font-black uppercase tracking-widest text-left", isDarkMode ? "text-slate-500" : "text-slate-400")}>
+                      Sponsorlar
+                    </h3>
+                    <div className={cn(
+                      "p-4 rounded-2xl border-2 grid grid-cols-2 gap-3",
+                      isDarkMode ? "bg-slate-800/50 border-slate-700" : "bg-slate-50 border-slate-100"
+                    )}>
+                      {[
+                        "WİFO", "FE", "MUZ FC", "FUNZONE AI", "Sequel Studio"
+                      ].map((sponsor, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                          <span className={cn("text-[10px] font-black uppercase tracking-tighter", isDarkMode ? "text-slate-300" : "text-slate-600")}>
+                            {sponsor}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className={cn("text-xs font-black uppercase tracking-widest text-left", isDarkMode ? "text-slate-500" : "text-slate-400")}>
+                      Destek & Şikayet
+                    </h3>
+                    <a 
+                      href="https://feyardimmerkezi.netlify.app" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className={cn(
+                        "w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between group",
+                        isDarkMode ? "bg-slate-800/50 border-slate-700 hover:border-indigo-500" : "bg-slate-50 border-slate-100 hover:border-indigo-600"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <AlertCircle size={20} />
+                        </div>
+                        <div className="text-left">
+                          <h3 className={cn("text-sm font-black", isDarkMode ? "text-white" : "text-slate-900")}>Sıkıntı veya Şikayet</h3>
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">FE Yardım Merkezi</p>
+                        </div>
+                      </div>
+                      <ExternalLink size={16} className="text-slate-400 group-hover:text-indigo-500 transition-colors" />
+                    </a>
+                  </div>
+
                   <div className="w-full space-y-3 pt-2">
                     {isFounder && (
                       <div className={cn(
@@ -1530,6 +1642,50 @@ export default function App() {
                           {isPlusActive ? "AKTİF" : "ETKİNLEŞTİR"}
                         </button>
                       </div>
+                    )}
+
+                    {isFounder && (
+                      <button
+                        onClick={async () => {
+                          setIsLoading(true);
+                          try {
+                            const freshAi = getAiInstance();
+                            const response = await freshAi.models.generateContent({
+                              model: 'gemini-2.5-flash-image',
+                              contents: {
+                                parts: [{ text: 'A futuristic, sleek, and vibrant AI app icon for "Funzone". High-tech aesthetic, 3D glassmorphism, indigo and purple gradients, centered friendly robot eye or stylized "F", 4k resolution, professional logo design.' }]
+                              },
+                              config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }
+                            });
+                            for (const part of response.candidates[0].content.parts) {
+                              if (part.inlineData) {
+                                localStorage.setItem('funzone_custom_icon', `data:image/png;base64,${part.inlineData.data}`);
+                                window.location.reload();
+                              }
+                            }
+                          } catch (err) {
+                            console.error("Icon generation failed:", err);
+                          } finally {
+                            setIsLoading(false);
+                          }
+                        }}
+                        disabled={isLoading}
+                        className="w-full py-4 bg-emerald-600/10 text-emerald-600 rounded-2xl font-bold hover:bg-emerald-600/20 transition-all active:scale-95 flex items-center justify-center gap-2"
+                      >
+                        <ImageIcon size={20} /> {isLoading ? "Üretiliyor..." : "Özel Uygulama İkonu Üret"}
+                      </button>
+                    )}
+
+                    {isFounder && localStorage.getItem('funzone_custom_icon') && (
+                      <button
+                        onClick={() => {
+                          localStorage.removeItem('funzone_custom_icon');
+                          window.location.reload();
+                        }}
+                        className="w-full py-4 bg-slate-600/10 text-slate-600 rounded-2xl font-bold hover:bg-slate-600/20 transition-all active:scale-95 flex items-center justify-center gap-2"
+                      >
+                        <Trash2 size={20} /> İkonu Sıfırla
+                      </button>
                     )}
 
                     {isFounder && (
@@ -1640,14 +1796,17 @@ export default function App() {
                 )}
               >
                 {mode === 'chat' ? <MessageSquare className="w-10 h-10" /> : 
-                 <ImageIcon className="w-10 h-10" />}
+                 mode === 'image' ? <ImageIcon className="w-10 h-10" /> :
+                 <FileUp className="w-10 h-10" />}
               </motion.div>
               <div className="space-y-2">
                 <h2 className={cn(
                   "text-3xl font-black tracking-tighter flex items-center gap-2",
                   isDarkMode ? "text-white" : "text-slate-900"
                 )}>
-                  {mode === 'chat' ? 'Nelerden bahsedelim?' : 'Ne çizelim?'}
+                  {mode === 'chat' ? 'Nelerden bahsedelim?' : 
+                   mode === 'image' ? 'Ne çizelim?' : 
+                   'Dosya Yükleme Modu'}
                   {isPlusActive && (
                     <span className="bg-indigo-600 text-white text-[10px] px-2 py-0.5 rounded-full shadow-lg animate-pulse">PLUS</span>
                   )}
@@ -1656,19 +1815,65 @@ export default function App() {
                   "text-lg font-medium max-w-sm mx-auto",
                   isDarkMode ? "text-slate-400" : "text-slate-500"
                 )}>
-                  {mode === 'chat' ? 'Funzone ile her konuda sohbet edebilirsin.' : 'Hayalindeki görseli tarif et, Funzone çizsin.'}
+                  {mode === 'chat' ? 'Funzone ile her konuda sohbet edebilirsin.' : 
+                   mode === 'image' ? 'Hayalindeki görseli tarif et, Funzone çizsin.' :
+                   'Analiz edilmesi için dosya yükleyin veya sürükleyin.'}
                 </p>
               </div>
+
+              {mode === 'upload' && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={cn(
+                    "w-full max-w-md p-10 rounded-[2.5rem] border-4 border-dashed transition-all cursor-pointer hover:scale-[1.02] active:scale-95",
+                    isDarkMode ? "bg-slate-900/50 border-slate-800 hover:border-indigo-500/50" : "bg-slate-50 border-slate-200 hover:border-indigo-500"
+                  )}
+                >
+                  <div className="flex flex-col items-center space-y-4">
+                    <div className="w-16 h-16 rounded-2xl bg-indigo-600/10 text-indigo-600 flex items-center justify-center">
+                      <FileUp size={32} />
+                    </div>
+                    <div className="space-y-1">
+                      <p className={cn("text-sm font-black", isDarkMode ? "text-white" : "text-slate-900")}>Dosya Seçin</p>
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-tighter">PDF, DOCX, TXT veya Görsel</p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {mode === 'chat' && (
+                <div className="grid grid-cols-2 gap-3 w-full max-w-md">
+                  {[
+                    { title: "Şiir Yaz", icon: Heart },
+                    { title: "Kod Yaz", icon: Cpu },
+                    { title: "Plan Yap", icon: Calendar },
+                    { title: "Hikaye Anlat", icon: MessageSquare },
+                  ].map((action, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setInput(action.title + "...")}
+                      className={cn(
+                        "p-4 rounded-2xl border transition-all flex items-center gap-3 hover:scale-105 active:scale-95",
+                        isDarkMode ? "bg-slate-900 border-slate-800 text-slate-400 hover:text-white" : "bg-white border-slate-100 text-slate-500 hover:text-indigo-600 shadow-sm"
+                      )}
+                    >
+                      <action.icon size={16} />
+                      <span className="text-xs font-black">{action.title}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <AnimatePresence mode="popLayout">
               {messages.map((message) => (
                 <motion.div
                   key={message.id}
-                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                  initial={{ opacity: 0, y: 10, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.4, ease: "easeOut" }}
+                  exit={{ opacity: 0, scale: 0.98 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
                   className={cn(
                     "flex gap-4 group",
                     message.role === 'user' ? "flex-row-reverse" : "flex-row"
@@ -1690,17 +1895,17 @@ export default function App() {
                     message.role === 'user' ? "items-end" : "items-start"
                   )}>
                     <motion.div 
-                      whileHover={{ scale: 1.01 }}
+                      whileHover={{ scale: 1.005, y: -1 }}
                       className={cn(
-                        "px-4 py-3 rounded-2xl shadow-sm relative group/msg transition-all duration-300",
+                        "px-5 py-3.5 rounded-[1.8rem] shadow-sm relative group/msg transition-all duration-500 ease-out",
                         message.role === 'user' 
-                          ? (isDarkMode ? "bg-slate-800 text-slate-100 rounded-tr-none" : "bg-slate-900 text-white rounded-tr-none") 
-                          : (isDarkMode ? "bg-slate-900 border border-slate-800 text-slate-100 rounded-tl-none" : "bg-white border border-slate-200 text-slate-800 rounded-tl-none")
+                          ? (isDarkMode ? "bg-slate-800 text-slate-100 rounded-tr-none shadow-indigo-500/5" : "bg-slate-900 text-white rounded-tr-none shadow-slate-400/10") 
+                          : (isDarkMode ? "bg-slate-900 border border-slate-800 text-slate-100 rounded-tl-none shadow-black/20" : "bg-white border border-slate-100 text-slate-800 rounded-tl-none shadow-slate-200/50")
                       )}
                     >
                       {message.role === 'assistant' && (
                         <div className="absolute -top-3 -left-3 flex items-center gap-1 z-10">
-                          <div className="bg-indigo-600 text-white text-[8px] font-black px-2 py-0.5 rounded-lg shadow-lg">
+                          <div className="bg-indigo-600 text-white text-[8px] font-black px-2 py-0.5 rounded-lg shadow-lg flex items-center gap-1">
                             {message.botName || 'Funzone AI'}
                           </div>
                           {isPlusActive && (
@@ -1790,24 +1995,36 @@ export default function App() {
           )}
           {isLoading && (
             <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
               className="flex gap-4"
             >
               <div className="w-9 h-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
                 <Bot size={18} />
               </div>
               <div className={cn(
-                "px-4 py-3 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-2 border transition-colors duration-300",
+                "px-4 py-3 rounded-2xl rounded-tl-none shadow-sm flex flex-col gap-2 border transition-all duration-300",
                 isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
               )}>
-                <Loader2 className="w-4 h-4 text-indigo-500 animate-spin" />
-                <span className={cn(
-                  "text-sm font-bold",
-                  isDarkMode ? "text-slate-400" : "text-slate-500"
-                )}>
-                  {mode === 'chat' ? 'Düşünüyor...' : 'Çiziyor...'}
-                </span>
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 text-indigo-500 animate-spin" />
+                  <span className={cn(
+                    "text-sm font-bold",
+                    isDarkMode ? "text-slate-400" : "text-slate-500"
+                  )}>
+                    {mode === 'chat' ? 'Düşünüyor...' : mode === 'image' ? 'Çiziyor...' : 'Dosya Yükleniyor...'}
+                  </span>
+                </div>
+                {mode === 'upload' && (
+                  <div className="w-32 h-1 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: "100%" }}
+                      transition={{ duration: 2 }}
+                      className="h-full bg-indigo-600"
+                    />
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
@@ -1820,12 +2037,36 @@ export default function App() {
         "p-4 border-t md:p-6 transition-all duration-500",
         isDarkMode ? "bg-slate-950 border-slate-800" : "bg-white border-slate-200"
       )}>
-        <div className="max-w-3xl mx-auto relative">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="relative"
-          >
+        <div className="max-w-3xl mx-auto space-y-4">
+          {/* Mode Switcher */}
+          <div className="flex justify-center gap-2">
+            {[
+              { id: 'chat', label: 'Sohbet', icon: MessageSquare },
+              { id: 'image', label: 'Görsel', icon: ImageIcon },
+              { id: 'upload', label: 'Yükleme', icon: FileUp },
+            ].map((m) => (
+              <button
+                key={m.id}
+                onClick={() => setMode(m.id as Mode)}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-xl border transition-all active:scale-95",
+                  mode === m.id 
+                    ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-500/20" 
+                    : (isDarkMode ? "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700" : "bg-slate-50 border-slate-100 text-slate-500 hover:border-slate-200")
+                )}
+              >
+                <m.icon size={14} />
+                <span className="text-[10px] font-black uppercase tracking-tighter">{m.label}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="relative">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="relative"
+            >
             <motion.textarea
               whileFocus={{ scale: 1.01, boxShadow: "0 20px 40px rgba(0,0,0,0.1)" }}
               value={input}
@@ -1837,7 +2078,9 @@ export default function App() {
                 }
               }}
               placeholder={
-                mode === 'chat' ? "Mesajını yaz..." : "Görseli tarif et..."
+                mode === 'chat' ? "Mesajını yaz..." : 
+                mode === 'image' ? "Görseli tarif et..." :
+                "Dosya adını veya analiz sorusunu yaz..."
               }
               className={cn(
                 "w-full border rounded-[2rem] px-6 py-5 pr-16 focus:outline-none focus:ring-4 transition-all duration-300 resize-none min-h-[64px] max-h-[200px] font-bold shadow-xl",
@@ -1864,7 +2107,8 @@ export default function App() {
             </motion.button>
           </motion.div>
         </div>
-        <div className="flex flex-col items-center justify-center gap-1 mt-4">
+      </div>
+      <div className="flex flex-col items-center justify-center gap-1 mt-4">
           <div className="flex items-center gap-2">
             <div className={cn("w-1.5 h-1.5 rounded-full animate-ping", isFounder ? "bg-yellow-400" : "bg-indigo-500")} />
             <p className={cn(
@@ -1914,6 +2158,18 @@ export default function App() {
               </div>
 
               <div className="relative space-y-8">
+                {/* Server Warning */}
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-4 rounded-2xl bg-rose-600/10 border border-rose-500/20 flex items-start gap-3"
+                >
+                  <AlertCircle className="text-rose-500 shrink-0 mt-0.5" size={18} />
+                  <p className="text-[10px] font-bold text-rose-500 leading-relaxed uppercase tracking-tighter">
+                    "Bu Yapay Zeka Diğer Yapay Zekalar aksine para almadığı için Sunucularımızı küçültük öğüzden yazma süreniz kısıltılıdır Teşekür ederiz!"
+                  </p>
+                </motion.div>
+
                 <div className="flex justify-between items-start">
                   <motion.div
                     key={onboardingStep}
@@ -1949,6 +2205,40 @@ export default function App() {
                   <p className={cn("text-base md:text-lg font-medium leading-relaxed", isDarkMode ? "text-slate-400" : "text-slate-500")}>
                     {ONBOARDING_STEPS[onboardingStep].desc}
                   </p>
+
+                  {onboardingStep === ONBOARDING_STEPS.length - 1 && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 }}
+                      className={cn(
+                        "w-full p-6 rounded-[2rem] border text-left space-y-4 mt-6",
+                        isDarkMode ? "bg-slate-950/50 border-slate-800" : "bg-slate-50/50 border-slate-100"
+                      )}
+                    >
+                      <div className="grid grid-cols-1 gap-1 text-[9px] font-bold uppercase tracking-tighter opacity-60">
+                        <p><span className="text-indigo-500">CODE BY:</span> Sequel Studio</p>
+                        <p><span className="text-indigo-500">UI AND SECURITY:</span> FE STUDIOS</p>
+                        <p><span className="text-indigo-500">BRAIN:</span> WİFO</p>
+                        <p><span className="text-indigo-500">OWNER:</span> WİFO/FE STUDIOS</p>
+                        <p><span className="text-indigo-500">MASTER OWNER:</span> FE HOLDER</p>
+                        <p><span className="text-indigo-500">THEME:</span> WİFO</p>
+                        <p><span className="text-indigo-500">INTERFACE:</span> FE STUDIOS</p>
+                        <p><span className="text-indigo-500">WİFO A2:</span> Sequel Studio</p>
+                        <p><span className="text-indigo-500">WİFO A1,5:</span> FE STUDIOS</p>
+                        <p><span className="text-indigo-500">WİFO A1:</span> FE STUDIOS</p>
+                        <p><span className="text-indigo-500">PLUS FEATURE:</span> WİFO</p>
+                      </div>
+                      <div className="h-px bg-slate-200 dark:bg-slate-800 w-full" />
+                      <div className="grid grid-cols-1 gap-1 text-[9px] font-bold uppercase tracking-tighter opacity-60">
+                        <p><span className="text-indigo-500">Center Supporter:</span> FE HOLDER</p>
+                        <p><span className="text-indigo-500">Software and Brain Development Supporter:</span> Sequel Studio</p>
+                        <p><span className="text-indigo-500">Inspector and Regulator:</span> Sequel Studio</p>
+                        <p><span className="text-indigo-500">Test Team:</span> Sequel Studio</p>
+                        <p><span className="text-indigo-500">Master Developer Team:</span> FE STUDIOS</p>
+                      </div>
+                    </motion.div>
+                  )}
                 </motion.div>
 
                 <div className="flex items-center justify-between pt-4">
