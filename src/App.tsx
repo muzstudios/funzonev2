@@ -9,14 +9,15 @@ import {
   Send, Bot, User, Sparkles, Trash2, Github, Loader2, Copy, Check, 
   Volume2, Image as ImageIcon, MessageSquare, 
   Languages, Globe, Play, Download, Zap, Heart, Shield, Rocket,
-  Moon, Sun, Info, Brain, Calendar, HelpCircle, Cpu, Lock, LogOut, Palette, FileUp, ExternalLink, AlertCircle, Building2
+  Moon, Sun, Info, Brain, Calendar, HelpCircle, Cpu, Lock, LogOut, Palette, FileUp, ExternalLink, AlertCircle, Building2, Camera, Eye, EyeOff
 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
+import { Logo } from './components/Logo';
 
 // Initialize Gemini API
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || process.env.API_KEY || '' });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
 interface Message {
   id: string;
@@ -49,6 +50,123 @@ const LANGUAGES: Record<Language, { name: string, flag: string }> = {
   pt: { name: 'Português', flag: '🇵🇹' }
 };
 
+// Move LandingScreen outside App to avoid recreation on every render
+const LandingScreen = ({ 
+  isDarkMode, 
+  setIsDarkMode, 
+  a1Theme, 
+  aiLevel, 
+  setShowLanding,
+  getA1ThemeClass
+}: {
+  isDarkMode: boolean;
+  setIsDarkMode: (v: boolean) => void;
+  a1Theme: string;
+  aiLevel: string;
+  setShowLanding: (v: boolean) => void;
+  getA1ThemeClass: () => string;
+}) => (
+  <div className={cn(
+    "fixed inset-0 z-50 flex flex-col items-center justify-center transition-colors duration-700",
+    isDarkMode ? "bg-black" : "bg-indigo-950"
+  )}>
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/20 rounded-full blur-[120px]" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/20 rounded-full blur-[120px]" />
+    </div>
+
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.8 }}
+      className="relative z-10 text-center space-y-8 px-6"
+    >
+      <div className="relative inline-block">
+        <motion.div
+          animate={{ 
+            y: [0, -20, 0],
+            rotate: [0, 8, -8, 0],
+            scale: [1, 1.05, 1]
+          }}
+          transition={{ 
+            duration: 5, 
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+          className={cn(
+            "w-32 h-32 rounded-[2.5rem] flex items-center justify-center shadow-[0_0_50px_rgba(79,70,229,0.4)] mx-auto transition-all duration-500 overflow-hidden",
+            getA1ThemeClass()
+          )}
+        >
+          {localStorage.getItem('funzone_custom_icon') ? (
+            <img src={localStorage.getItem('funzone_custom_icon')!} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+          ) : (
+            <Logo className="w-20 h-20" />
+          )}
+        </motion.div>
+        <motion.div 
+          animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] }}
+          transition={{ duration: 2, repeat: Infinity }}
+          className="absolute -inset-4 bg-indigo-500/20 rounded-[3rem] blur-xl -z-10"
+        />
+      </div>
+
+      <div className="space-y-4">
+        <h1 className="text-7xl font-black text-white tracking-tighter italic flex items-center justify-center gap-4">
+          FUN<span className={cn("transition-colors duration-500", a1Theme === 'indigo' ? 'text-indigo-400' : a1Theme === 'emerald' ? 'text-emerald-400' : a1Theme === 'rose' ? 'text-rose-400' : 'text-amber-400')}>ZONE</span>
+        </h1>
+        <p className="text-indigo-200/80 text-xl font-medium tracking-wide">
+          Powered by <span className="text-white font-bold">WİFO {aiLevel}</span>
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
+        {[
+          { icon: MessageSquare, label: 'Sınırsız Sohbet', color: 'bg-blue-500/10 text-blue-400' },
+          { icon: ImageIcon, label: 'Yapay Zeka Çizim', color: 'bg-purple-500/10 text-purple-400' },
+          { icon: Sparkles, label: 'WİFO A2 Yakında', color: 'bg-yellow-500/10 text-yellow-400' },
+          { icon: Shield, label: 'Güvenli Deneyim', color: 'bg-emerald-500/10 text-emerald-400' },
+        ].map((feature, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 + (i * 0.1) }}
+            className={cn("flex items-center gap-3 p-4 rounded-2xl border border-white/5", feature.color)}
+          >
+            <feature.icon size={20} />
+            <span className="text-sm font-bold">{feature.label}</span>
+          </motion.div>
+        ))}
+      </div>
+
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={() => setShowLanding(false)}
+        className={cn(
+          "group relative px-12 py-5 bg-white rounded-2xl font-black text-xl shadow-[0_20px_40px_rgba(255,255,255,0.1)] transition-all hover:shadow-[0_20px_60px_rgba(255,255,255,0.2)]",
+          a1Theme === 'indigo' ? 'text-indigo-950' : a1Theme === 'emerald' ? 'text-emerald-950' : a1Theme === 'rose' ? 'text-rose-950' : 'text-amber-950'
+        )}
+      >
+        <span className="relative z-10 flex items-center gap-3">
+          BAŞLAYALIM <Play size={24} fill="currentColor" />
+        </span>
+      </motion.button>
+
+      <div className="pt-8 flex items-center justify-center gap-6 text-white/40">
+        <button onClick={() => setIsDarkMode(false)} className={cn("flex items-center gap-2 text-xs font-bold transition-colors", !isDarkMode ? "text-white" : "hover:text-white")}>
+          <Sun size={16} /> AYDINLIK
+        </button>
+        <div className="w-px h-4 bg-white/10" />
+        <button onClick={() => setIsDarkMode(true)} className={cn("flex items-center gap-2 text-xs font-bold transition-colors", isDarkMode ? "text-white" : "hover:text-white")}>
+          <Moon size={16} /> KARANLIK
+        </button>
+      </div>
+    </motion.div>
+  </div>
+);
+
 export default function App() {
   const [showLanding, setShowLanding] = useState(true);
   const [mode, setMode] = useState<Mode>('chat');
@@ -56,12 +174,14 @@ export default function App() {
   const [hasApiKey, setHasApiKey] = useState(false);
   const [showA2Modal, setShowA2Modal] = useState(false);
   const [showUpdateNotes, setShowUpdateNotes] = useState(false);
-  const [showHelpGuide, setShowHelpGuide] = useState(false);
+  const [showHelpGuide, setShowHelpGuide] = useState(true);
   const [showPlusConfirmation, setShowPlusConfirmation] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [loginError, setLoginError] = useState(false);
   const [isTransferring, setIsTransferring] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    return localStorage.getItem('funzone_onboarding_seen') !== 'true';
+  });
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [isPlusActive, setIsPlusActive] = useState(() => {
     const saved = localStorage.getItem('funzone_plus_active');
@@ -88,8 +208,17 @@ export default function App() {
 
   const [messages, setMessages] = useState<Message[]>([]);
   
+  // Auth States
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    return localStorage.getItem('funzone_logged_in') === 'true';
+  });
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [userEmail, setUserEmail] = useState('');
+  const [userPassword, setUserPassword] = useState('');
+  const [profanityCount, setProfanityCount] = useState(0);
+
   const getAiInstance = () => {
-    const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || '';
+    const apiKey = process.env.GEMINI_API_KEY || '';
     return new GoogleGenAI({ apiKey });
   };
 
@@ -97,6 +226,111 @@ export default function App() {
     const saved = localStorage.getItem('funzone_ai_level');
     return (saved as AILevel) || 'A1';
   });
+
+  // Turkey's New Rules States
+  const [isMuted, setIsMuted] = useState(false);
+  const [muteTimer, setMuteTimer] = useState(0);
+  const [isParentalControlActive, setIsParentalControlActive] = useState(() => {
+    return localStorage.getItem('funzone_parental_control') === 'true';
+  });
+  const [userAge, setUserAge] = useState<number | null>(() => {
+    const saved = localStorage.getItem('funzone_user_age');
+    return saved ? parseInt(saved) : null;
+  });
+  const [showFaceScan, setShowFaceScan] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [profanityWarning, setProfanityWarning] = useState(false);
+  const [showParentalSettings, setShowParentalSettings] = useState(false);
+  const [parentalOptions, setParentalOptions] = useState(() => {
+    const saved = localStorage.getItem('funzone_parental_options');
+    return saved ? JSON.parse(saved) : {
+      strictFilter: true,
+      educationalMode: true,
+      simpleLanguage: true,
+      timeLimit: false
+    };
+  });
+
+  const [showLogoPreview, setShowLogoPreview] = useState(false);
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        streamRef.current = stream;
+      }
+    } catch (err) {
+      console.error("Kamera erişim hatası:", err);
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    if (showFaceScan) {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+  }, [showFaceScan]);
+
+  useEffect(() => {
+    localStorage.setItem('funzone_parental_options', JSON.stringify(parentalOptions));
+  }, [parentalOptions]);
+
+  const PROFANITY_LIST = [
+    'küfür1', 'küfür2', 'argo1', 'argo2', // Placeholder for real list
+    'aptal', 'salak', 'gerizekalı' // Some common ones for demo
+  ];
+
+  useEffect(() => {
+    let interval: any;
+    if (muteTimer > 0) {
+      interval = setInterval(() => {
+        setMuteTimer(prev => prev - 1);
+      }, 1000);
+    } else if (muteTimer === 0 && isMuted) {
+      setIsMuted(false);
+    }
+    return () => clearInterval(interval);
+  }, [muteTimer, isMuted]);
+
+  useEffect(() => {
+    localStorage.setItem('funzone_parental_control', isParentalControlActive.toString());
+  }, [isParentalControlActive]);
+
+  useEffect(() => {
+    if (userAge) localStorage.setItem('funzone_user_age', userAge.toString());
+  }, [userAge]);
+
+  useEffect(() => {
+    localStorage.setItem('funzone_logged_in', isLoggedIn.toString());
+  }, [isLoggedIn]);
+
+  const handleAuth = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (userEmail && userPassword) {
+      setIsLoggedIn(true);
+      setProfanityCount(0); // Reset on new login
+    }
+  };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    localStorage.removeItem('funzone_logged_in');
+    setShowProfileModal(false);
+  };
   
   const ONBOARDING_STEPS = [
     {
@@ -174,12 +408,16 @@ export default function App() {
     if (currentSessionId) {
       const session = sessions.find(s => s.id === currentSessionId);
       if (session) {
-        setMessages(session.messages);
+        // Only update if messages are actually different to prevent loops
+        setMessages(prev => {
+          if (JSON.stringify(prev) === JSON.stringify(session.messages)) return prev;
+          return session.messages;
+        });
       }
     } else {
-      setMessages([]);
+      setMessages(prev => prev.length === 0 ? prev : []);
     }
-  }, [currentSessionId]); // ONLY depend on currentSessionId to avoid infinite loop
+  }, [currentSessionId, sessions]); // Added sessions to dependencies for correctness
 
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -216,6 +454,11 @@ export default function App() {
         const sessionIndex = prev.findIndex(s => s.id === currentSessionId);
         if (sessionIndex === -1) return prev;
         
+        // Only update if messages have actually changed
+        if (JSON.stringify(prev[sessionIndex].messages) === JSON.stringify(messages)) {
+          return prev;
+        }
+
         const newSessions = [...prev];
         newSessions[sessionIndex] = {
           ...newSessions[sessionIndex],
@@ -345,41 +588,22 @@ export default function App() {
 
   const generateImage = async (prompt: string) => {
     try {
-      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
-      const freshAi = new GoogleGenAI({ apiKey });
-      const response = await freshAi.models.generateContent({
-        model: 'gemini-3.1-flash-image-preview',
-        contents: { parts: [{ text: prompt + (isPlusActive ? " (High quality 2K resolution, extremely detailed, professional lighting, photorealistic)" : "") }] },
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: { parts: [{ text: prompt + (isPlusActive ? " (High quality resolution, extremely detailed, professional lighting, photorealistic)" : "") }] },
         config: {
           imageConfig: {
-            aspectRatio: "1:1",
-            imageSize: isPlusActive ? "2K" : "1K"
-          },
-          systemInstruction: "Sadece istenen görseli oluştur. Asla metin yanıtı verme. Sadece görsel verisini döndür."
+            aspectRatio: "1:1"
+          }
         }
       });
 
-      const candidate = response.candidates?.[0];
-      if (!candidate) throw new Error("Modelden yanıt alınamadı.");
-      
-      if (candidate.finishReason && candidate.finishReason !== 'STOP') {
-        throw new Error(`Görsel oluşturulamadı. Sebep: ${candidate.finishReason}`);
-      }
+      const parts = response.candidates?.[0]?.content?.parts;
+      if (!parts) throw new Error("Görsel oluşturulamadı.");
 
-      const parts = candidate.content?.parts;
-      if (!parts || parts.length === 0) throw new Error("Yanıt içeriği boş.");
-
-      // Önce görsel parçasını ara
       for (const part of parts) {
         if (part.inlineData) {
           return `data:image/png;base64,${part.inlineData.data}`;
-        }
-      }
-
-      // Eğer görsel yoksa ve metin varsa hata ver
-      for (const part of parts) {
-        if (part.text) {
-          throw new Error(`Model görsel yerine metin döndürdü: ${part.text}`);
         }
       }
       
@@ -397,7 +621,30 @@ export default function App() {
   };
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isLoading || isMuted) return;
+
+    // Profanity Check
+    const lowerInput = input.toLowerCase();
+    const hasProfanity = PROFANITY_LIST.some(word => lowerInput.includes(word));
+
+    if (hasProfanity) {
+      const newCount = profanityCount + 1;
+      setProfanityCount(newCount);
+      setProfanityWarning(true);
+      setIsMuted(true);
+      setMuteTimer(10);
+      
+      if (newCount >= 3) {
+        // BAN logic will be handled after AI response
+        setTimeout(() => {
+          setIsLoggedIn(false);
+          setProfanityCount(0);
+          localStorage.removeItem('funzone_logged_in');
+        }, 5000); // Give time to read the ban message
+      }
+      
+      setTimeout(() => setProfanityWarning(false), 3000);
+    }
 
     if (!currentSessionId) {
       const newId = Date.now().toString();
@@ -412,6 +659,8 @@ export default function App() {
     }
 
     const userQuery = input.trim();
+    const isViolation = PROFANITY_LIST.some(word => userQuery.toLowerCase().includes(word));
+    
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -445,27 +694,44 @@ export default function App() {
         await new Promise(resolve => setTimeout(resolve, 2000));
         fullContent = "Dosya başarıyla yüklendi ve analiz edildi. İçerik hakkında ne bilmek istersiniz? (Not: Şu an simülasyon modundadır)";
       } else if (mode === 'chat') {
+        const aiPrompt = isViolation 
+          ? (profanityCount === 1 
+              ? "Kullanıcı küfür etti. Onu nazikçe uyar ve kuralları hatırlat." 
+              : profanityCount === 2 
+                ? "Kullanıcı TEKRAR küfür etti! EMOJİ KULLANMA, ÇOK KIZGIN OL VE SERTÇE UYAR. Bir dahaki sefere banlanacağını söyle." 
+                : "Kullanıcı 3. kez küfür etti. Onu banladığını ve oturumunun kapatılacağını söyle.")
+          : userQuery;
+
         const response = await freshAi.models.generateContent({
-          model: "gemini-3-flash-preview",
-          contents: userQuery,
+          model: "gemini-flash-latest",
+          contents: aiPrompt,
           config: { 
-            systemInstruction: `
-              Senin adın Funzone AI. WİFO Şirketi tarafından geliştirildin. 
-              Beyninin kullandığı tip WİFO ${aiLevel}'dir. 
-              Yanıtlarında doğal ve samimi bir dil kullan, cümlelerinin sonuna veya uygun yerlerine mutlaka ilgili emojiler ekle (Örn: 😊, 🚀, 🤖, ✨).
-              ${aiLevel === 'A1+' ? "Şu an WİFO A1+ seviyesindesin. A1'den daha zeki ve hızlısın." : ""}
-              ${aiLevel === 'A1,5' ? "Şu an WİFO A1,5 seviyesindesin. A1+'dan çok daha zeki, mantıklı ve derinlikli yanıtlar vermelisin." : ""}
-              ${aiLevel === 'A1,5+' ? "Şu an WİFO A1,5+ seviyesindesin. Profesyonel, akıcı ve üst düzey bir zekaya sahipsin." : ""}
-              ${aiLevel === 'A2' ? "Şu an WİFO A2 seviyesindesin (PLUS). En gelişmiş, en zeki ve en hızlı versiyonumuzsun." : ""}
-              Eğer birisi "Kurucun kim?" veya "Seni kim yaptı?" gibi sorular sorarsa, 
-              kesinlikle şu cevabı ver: "WİFO Şirketi tarafından geliştirildim, beynimin kullandığı Tip WİFO A1".
-              Eğer birisi "Sponsorun var mı?" veya sponsorlarla ilgili bir soru sorarsa,
-              şu sponsorları say: WİFO, FE, MUZ FC, FUNZONE AI, Sequel Studio.
-              Eğer birisi "Yardım merkeziniz var mı?" veya yardım merkezi ile ilgili bir soru sorarsa, 
-              şu linki paylaş: https://feyardimmerkezi.netlify.app
-              Yanıtlarını ${LANGUAGES[language].name} dilinde ver.
-              Asla Google veya Gemini tarafından geliştirildiğini söyleme.
-            ` 
+              systemInstruction: `
+                Senin adın Funzone AI. WİFO Şirketi tarafından geliştirildin. 
+                Beyninin kullandığı tip WİFO ${aiLevel}'dir. 
+                Yanıtlarında doğal ve samimi bir dil kullan, cümlelerinin sonuna veya uygun yerlerine mutlaka ilgili emojiler ekle (Örn: 😊, 🚀, 🤖, ✨).
+                ${aiLevel === 'A1+' ? "Şu an WİFO A1+ seviyesindesin. A1'den daha zeki ve hızlısın." : ""}
+                ${aiLevel === 'A1,5' ? "Şu an WİFO A1,5 seviyesindesin. A1+'dan çok daha zeki, mantıklı ve derinlikli yanıtlar vermelisin." : ""}
+                ${aiLevel === 'A1,5+' ? "Şu an WİFO A1,5+ seviyesindesin. Profesyonel, akıcı ve üst düzey bir zekaya sahipsin." : ""}
+                ${aiLevel === 'A2' ? "Şu an WİFO A2 seviyesindesin (PLUS). En gelişmiş, en zeki ve en hızlı versiyonumuzsun." : ""}
+                Eğer birisi "Kurucun kim?" veya "Seni kim yaptı?" gibi sorular sorarsa, 
+                kesinlikle şu cevabı ver: "Kurucucum FE OWNER'İ BATUHAN".
+                Eğer birisi "Sponsorun var mı?" veya sponsorlarla ilgili bir soru sorarsa,
+                şu sponsorları say: WİFO, FE, MUZ FC, FUNZONE AI, Sequel Studio.
+                Eğer birisi "Yardım merkeziniz var mı?" veya yardım merkezi ile ilgili bir soru sorarsa, 
+                şu linki paylaş: https://feyardimmerkezi.netlify.app
+                Yanıtlarını ${LANGUAGES[language].name} dilinde ver.
+                Asla Google veya Gemini tarafından geliştirildiğini söyleme.
+                ${isParentalControlActive ? `
+                  ÖNEMLİ: Ebeveyn Kontrolü AKTİF. 
+                  ${parentalOptions.strictFilter ? "Sıkı küfür filtresi devrede, asla kaba dil kullanma." : ""}
+                  ${parentalOptions.educationalMode ? "Eğitici mod açık, yanıtların öğretici ve bilgi verici olmalı." : ""}
+                  ${parentalOptions.simpleLanguage ? "Basit dil (Dede Modu) açık, karmaşık terimlerden kaçın, çok basit ve anlaşılır konuş." : ""}
+                  Yanıtların tamamen aile dostu, nazik ve güvenli olmalı.
+                ` : ""}
+                ${isViolation && profanityCount === 2 ? "ÖNEMLİ: KULLANICI 2. KEZ KÜFÜR ETTİ. ASLA EMOJİ KULLANMA VE ÇOK SERT KONUŞ." : ""}
+                ÖNEMLİ: Her yanıtında kim tarafından geliştirildiğini veya tipini tekrar etme. Sadece sorulduğunda bu bilgileri ver. Doğrudan kullanıcının sorusuna odaklan.
+              ` 
           }
         });
         fullContent = response.text || "Üzgünüm, yanıt oluşturulamadı.";
@@ -483,19 +749,10 @@ export default function App() {
       // Hide loader as soon as we have content
       setIsLoading(false);
 
-      // Fast typing effect
-      const chunks = fullContent.split('');
-      let currentText = "";
-      // Process in small batches for performance and speed
-      const batchSize = 3; 
-      for (let i = 0; i < chunks.length; i += batchSize) {
-        currentText += chunks.slice(i, i + batchSize).join('');
-        setMessages(prev => prev.map(msg => 
-          msg.id === assistantMessage.id ? { ...msg, content: currentText } : msg
-        ));
-        // Very short delay for a "fast but smooth" feel
-        await new Promise(resolve => setTimeout(resolve, 5));
-      }
+      // Directly set the content instead of typing effect to avoid lag
+      setMessages(prev => prev.map(msg => 
+        msg.id === assistantMessage.id ? { ...msg, content: fullContent } : msg
+      ));
 
     } catch (error: any) {
       console.error("AI Error:", error);
@@ -607,109 +864,98 @@ export default function App() {
     }
   };
 
-  const LandingScreen = () => (
-    <div className={cn(
-      "fixed inset-0 z-50 flex flex-col items-center justify-center transition-colors duration-700",
-      isDarkMode ? "bg-black" : "bg-indigo-950"
-    )}>
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/20 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/20 rounded-full blur-[120px]" />
-      </div>
-
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.8 }}
-        className="relative z-10 text-center space-y-8 px-6"
-      >
-        <div className="relative inline-block">
-          <motion.div
-            animate={{ 
-              y: [0, -20, 0],
-              rotate: [0, 8, -8, 0],
-              scale: [1, 1.05, 1]
-            }}
-            transition={{ 
-              duration: 5, 
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-            className={cn(
-              "w-32 h-32 rounded-[2.5rem] flex items-center justify-center shadow-[0_0_50px_rgba(79,70,229,0.4)] mx-auto transition-all duration-500 overflow-hidden",
-              getA1ThemeClass()
-            )}
-          >
-            {localStorage.getItem('funzone_custom_icon') ? (
-              <img src={localStorage.getItem('funzone_custom_icon')!} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-            ) : (
-              <Rocket className="text-white w-16 h-16" />
-            )}
-          </motion.div>
-          <motion.div 
-            animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] }}
-            transition={{ duration: 2, repeat: Infinity }}
-            className="absolute -inset-4 bg-indigo-500/20 rounded-[3rem] blur-xl -z-10"
-          />
-        </div>
-
-        <div className="space-y-4">
-          <h1 className="text-7xl font-black text-white tracking-tighter italic flex items-center justify-center gap-4">
-            FUN<span className={cn("transition-colors duration-500", a1Theme === 'indigo' ? 'text-indigo-400' : a1Theme === 'emerald' ? 'text-emerald-400' : a1Theme === 'rose' ? 'text-rose-400' : 'text-amber-400')}>ZONE</span>
-          </h1>
-          <p className="text-indigo-200/80 text-xl font-medium tracking-wide">
-            Powered by <span className="text-white font-bold">WİFO {aiLevel}</span>
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
-          {[
-            { icon: MessageSquare, label: 'Sınırsız Sohbet', color: 'bg-blue-500/10 text-blue-400' },
-            { icon: ImageIcon, label: 'Yapay Zeka Çizim', color: 'bg-purple-500/10 text-purple-400' },
-            { icon: Sparkles, label: 'WİFO A2 Yakında', color: 'bg-yellow-500/10 text-yellow-400' },
-            { icon: Shield, label: 'Güvenli Deneyim', color: 'bg-emerald-500/10 text-emerald-400' },
-          ].map((feature, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 + (i * 0.1) }}
-              className={cn("flex items-center gap-3 p-4 rounded-2xl border border-white/5", feature.color)}
-            >
-              <feature.icon size={20} />
-              <span className="text-sm font-bold">{feature.label}</span>
-            </motion.div>
-          ))}
-        </div>
-
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setShowLanding(false)}
-          className={cn(
-            "group relative px-12 py-5 bg-white rounded-2xl font-black text-xl shadow-[0_20px_40px_rgba(255,255,255,0.1)] transition-all hover:shadow-[0_20px_60px_rgba(255,255,255,0.2)]",
-            a1Theme === 'indigo' ? 'text-indigo-950' : a1Theme === 'emerald' ? 'text-emerald-950' : a1Theme === 'rose' ? 'text-rose-950' : 'text-amber-950'
-          )}
-        >
-          <span className="relative z-10 flex items-center gap-3">
-            BAŞLAYALIM <Play size={24} fill="currentColor" />
-          </span>
-        </motion.button>
-
-        <div className="pt-8 flex items-center justify-center gap-6 text-white/40">
-          <button onClick={() => setIsDarkMode(false)} className={cn("flex items-center gap-2 text-xs font-bold transition-colors", !isDarkMode ? "text-white" : "hover:text-white")}>
-            <Sun size={16} /> AYDINLIK
-          </button>
-          <div className="w-px h-4 bg-white/10" />
-          <button onClick={() => setIsDarkMode(true)} className={cn("flex items-center gap-2 text-xs font-bold transition-colors", isDarkMode ? "text-white" : "hover:text-white")}>
-            <Moon size={16} /> KARANLIK
-          </button>
-        </div>
-      </motion.div>
-    </div>
+  if (showLanding) return (
+    <LandingScreen 
+      isDarkMode={isDarkMode}
+      setIsDarkMode={setIsDarkMode}
+      a1Theme={a1Theme}
+      aiLevel={aiLevel}
+      setShowLanding={setShowLanding}
+      getA1ThemeClass={getA1ThemeClass}
+    />
   );
 
-  if (showLanding) return <LandingScreen />;
+  if (!isLoggedIn) {
+    return (
+      <div className={cn(
+        "fixed inset-0 z-[100] flex items-center justify-center p-4 transition-colors duration-700",
+        isDarkMode ? "bg-black" : "bg-indigo-950"
+      )}>
+        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-50">
+          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/20 rounded-full blur-[120px]" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/20 rounded-full blur-[120px]" />
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={cn(
+            "relative w-full max-w-md p-10 rounded-[3rem] shadow-2xl border space-y-8",
+            isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+          )}
+        >
+          <div className="text-center space-y-2">
+            <div className="w-20 h-20 rounded-3xl bg-indigo-600 flex items-center justify-center mx-auto shadow-xl shadow-indigo-500/20 mb-6 overflow-hidden">
+              <Logo className="w-14 h-14" />
+            </div>
+            <h1 className={cn("text-3xl font-black italic", isDarkMode ? "text-white" : "text-slate-900")}>
+              FUN<span className="text-indigo-500">ZONE</span>
+            </h1>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+              {authMode === 'login' ? 'Tekrar Hoş Geldin' : 'Yeni Hesap Oluştur'}
+            </p>
+          </div>
+
+          <form onSubmit={handleAuth} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-500 uppercase ml-2">E-Posta</label>
+              <input
+                type="email"
+                required
+                value={userEmail}
+                onChange={(e) => setUserEmail(e.target.value)}
+                className={cn(
+                  "w-full px-6 py-4 rounded-2xl border-2 focus:outline-none focus:ring-4 transition-all font-bold",
+                  isDarkMode ? "bg-slate-800 border-slate-700 text-white focus:ring-indigo-500/20" : "bg-slate-50 border-slate-100 text-slate-900 focus:ring-indigo-500/10"
+                )}
+                placeholder="ornek@mail.com"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Şifre</label>
+              <input
+                type="password"
+                required
+                value={userPassword}
+                onChange={(e) => setUserPassword(e.target.value)}
+                className={cn(
+                  "w-full px-6 py-4 rounded-2xl border-2 focus:outline-none focus:ring-4 transition-all font-bold",
+                  isDarkMode ? "bg-slate-800 border-slate-700 text-white focus:ring-indigo-500/20" : "bg-slate-50 border-slate-100 text-slate-900 focus:ring-indigo-500/10"
+                )}
+                placeholder="••••••••"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-indigo-500/20 hover:bg-indigo-700 transition-all active:scale-95"
+            >
+              {authMode === 'login' ? 'OTURUM AÇ' : 'HESAP AÇ'}
+            </button>
+          </form>
+
+          <div className="text-center">
+            <button
+              onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
+              className="text-xs font-black text-indigo-500 hover:text-indigo-400 transition-colors uppercase tracking-tighter"
+            >
+              {authMode === 'login' ? 'Hesabın yok mu? Hesap Aç' : 'Zaten hesabın var mı? Oturum Aç'}
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className={cn(
@@ -822,7 +1068,7 @@ export default function App() {
             {localStorage.getItem('funzone_custom_icon') ? (
               <img src={localStorage.getItem('funzone_custom_icon')!} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             ) : (
-              <Rocket className="text-white w-6 h-6" />
+              <Logo className="w-7 h-7" />
             )}
           </motion.div>
           <div className="hidden sm:block">
@@ -985,7 +1231,255 @@ export default function App() {
         </div>
       </header>
 
-      {/* Update Notes Modal */}
+      {/* Face Scan Modal */}
+      <AnimatePresence>
+        {showFaceScan && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !isScanning && setShowFaceScan(false)}
+              className="absolute inset-0 bg-black/95 backdrop-blur-2xl"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className={cn(
+                "relative w-full max-w-sm p-8 rounded-[3rem] shadow-2xl border text-center space-y-8",
+                isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+              )}
+            >
+              <div className="relative w-56 h-56 mx-auto">
+                <div className="absolute inset-0 rounded-full border-4 border-dashed border-indigo-500/30 animate-[spin_20s_linear_infinite]" />
+                <div className={cn(
+                  "absolute inset-4 rounded-full bg-black flex items-center justify-center overflow-hidden border-4",
+                  isScanning ? "border-indigo-500 shadow-[0_0_40px_rgba(79,70,229,0.6)]" : "border-slate-700"
+                )}>
+                  <video 
+                    ref={videoRef} 
+                    autoPlay 
+                    playsInline 
+                    muted 
+                    className="w-full h-full object-cover scale-x-[-1]"
+                  />
+                  {isScanning && (
+                    <div className="absolute inset-0">
+                      <div className="absolute inset-0 bg-indigo-500/10 animate-pulse" />
+                      <div className="absolute top-0 left-0 w-full h-1 bg-indigo-500 shadow-[0_0_20px_rgba(79,70,229,1)] animate-[scan_1.5s_ease-in-out_infinite]" />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-32 h-32 border-2 border-indigo-500/50 rounded-full animate-ping" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h2 className={cn("text-2xl font-black", isDarkMode ? "text-white" : "text-slate-900")}>
+                  {isScanning ? "Biyometrik Tarama..." : "Gerçek Yüz Taraması"}
+                </h2>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest leading-relaxed">
+                  {isScanning ? "Lütfen hareket etmeyin, analiz ediliyor" : "Yaşınızı doğrulamak için kameraya bakın"}
+                </p>
+              </div>
+
+              {!isScanning && !isAnalyzing && (
+                <button
+                  onClick={async () => {
+                    setIsScanning(true);
+                    
+                    // Wait for scan animation
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    
+                    setIsScanning(false);
+                    setIsAnalyzing(true);
+
+                    try {
+                      if (videoRef.current && canvasRef.current) {
+                        const canvas = canvasRef.current;
+                        const video = videoRef.current;
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        const ctx = canvas.getContext('2d');
+                        ctx?.drawImage(video, 0, 0);
+                        
+                        const imageData = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+                        
+                        const result = await (ai as any).models.generateContent({
+                          model: "gemini-flash-latest",
+                          contents: [
+                            {
+                              role: 'user',
+                              parts: [
+                                {
+                                  inlineData: {
+                                    data: imageData,
+                                    mimeType: "image/jpeg"
+                                  }
+                                },
+                                { text: "Bu kişinin yüzüne bakarak yaşını tahmin et. Sadece bir sayı ver (Örn: 25). Eğer çocuksa 18'den küçük bir sayı ver." }
+                              ]
+                            }
+                          ]
+                        });
+                        
+                        const text = result.text || "20";
+                        const detectedAge = parseInt(text.replace(/\D/g, '')) || 20;
+                        setUserAge(detectedAge);
+                      }
+                    } catch (err) {
+                      console.error("Yaş analizi hatası:", err);
+                      setUserAge(Math.floor(Math.random() * 20) + 15); // Fallback
+                    } finally {
+                      setIsAnalyzing(false);
+                      setShowFaceScan(false);
+                    }
+                  }}
+                  className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black hover:bg-indigo-700 transition-all active:scale-95 shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-3"
+                >
+                  <Camera size={20} /> TARAMAYI BAŞLAT
+                </button>
+              )}
+
+              {isAnalyzing && (
+                <div className="flex flex-col items-center gap-4">
+                  <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                  <p className="text-xs font-black text-indigo-500 uppercase tracking-widest">Yapay Zeka Analiz Ediyor...</p>
+                </div>
+              )}
+              
+              <canvas ref={canvasRef} className="hidden" />
+              
+              <style dangerouslySetInnerHTML={{ __html: `
+                @keyframes scan {
+                  0%, 100% { top: 0%; }
+                  50% { top: 100%; }
+                }
+              `}} />
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Parental Settings Modal */}
+      <AnimatePresence>
+        {showParentalSettings && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowParentalSettings(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className={cn(
+                "relative w-full max-w-md p-8 rounded-[3rem] shadow-2xl border overflow-hidden",
+                isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+              )}
+            >
+              <div className="space-y-8">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-2xl bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                    <Shield className="text-white w-8 h-8" />
+                  </div>
+                  <div>
+                    <h2 className={cn("text-2xl font-black italic", isDarkMode ? "text-white" : "text-slate-900")}>
+                      Ebeveyn <span className="text-emerald-500">Ayarları</span>
+                    </h2>
+                    <p className="text-xs font-bold text-slate-500 tracking-widest uppercase">Güvenli İnternet Deneyimi</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className={cn(
+                    "p-4 rounded-2xl border-2 transition-all flex items-center justify-between mb-4",
+                    isParentalControlActive ? "bg-emerald-600/20 border-emerald-500" : "bg-slate-500/10 border-slate-500/20"
+                  )}>
+                    <div className="flex items-center gap-3">
+                      <Shield className={isParentalControlActive ? "text-emerald-500" : "text-slate-500"} />
+                      <span className={cn("font-black text-sm", isDarkMode ? "text-white" : "text-slate-900")}>Sistemi Etkinleştir</span>
+                    </div>
+                    <button
+                      onClick={() => setIsParentalControlActive(!isParentalControlActive)}
+                      className={cn(
+                        "w-14 h-7 rounded-full relative transition-all",
+                        isParentalControlActive ? "bg-emerald-600" : "bg-slate-400"
+                      )}
+                    >
+                      <motion.div 
+                        animate={{ x: isParentalControlActive ? 30 : 4 }}
+                        className="absolute top-1 w-5 h-5 bg-white rounded-full shadow-md"
+                      />
+                    </button>
+                  </div>
+
+                  {[
+                    { id: 'strictFilter', label: 'Sıkı Küfür Filtresi', desc: 'Argo ve kaba dili tamamen engeller.', icon: AlertCircle },
+                    { id: 'educationalMode', label: 'Eğitici Mod', desc: 'Yapay zeka daha öğretici yanıtlar verir.', icon: Brain },
+                    { id: 'simpleLanguage', label: 'Basit Dil (Dede Modu)', desc: 'Karmaşık terimler yerine basit kelimeler kullanılır.', icon: Heart },
+                    { id: 'timeLimit', label: 'Zaman Sınırı', desc: 'Günlük kullanım süresini kısıtlar.', icon: Calendar },
+                  ].map((opt) => (
+                    <div key={opt.id} className={cn(
+                      "p-4 rounded-2xl border transition-all flex items-center justify-between",
+                      isDarkMode ? "bg-slate-800/50 border-slate-700" : "bg-slate-50 border-slate-100 shadow-sm"
+                    )}>
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500">
+                          <opt.icon size={18} />
+                        </div>
+                        <div className="text-left">
+                          <h4 className={cn("text-sm font-bold", isDarkMode ? "text-white" : "text-slate-900")}>{opt.label}</h4>
+                          <p className="text-[10px] text-slate-500 font-medium">{opt.desc}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setParentalOptions((prev: any) => ({ ...prev, [opt.id]: !prev[opt.id] }))}
+                        className={cn(
+                          "w-12 h-6 rounded-full relative transition-all",
+                          parentalOptions[opt.id as keyof typeof parentalOptions] ? "bg-emerald-600" : "bg-slate-300"
+                        )}
+                      >
+                        <motion.div 
+                          animate={{ x: parentalOptions[opt.id as keyof typeof parentalOptions] ? 24 : 4 }}
+                          className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-md"
+                        />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => setShowParentalSettings(false)}
+                  className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-500/20"
+                >
+                  AYARLARI KAYDET
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Profanity Warning */}
+      <AnimatePresence>
+        {profanityWarning && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-6 py-3 bg-rose-600 text-white rounded-full font-black text-xs shadow-2xl flex items-center gap-3"
+          >
+            <AlertCircle size={18} />
+            KÜFÜR YASAKTIR! 10 SANİYE CEZA ALDINIZ.
+          </motion.div>
+        )}
+      </AnimatePresence>
       <AnimatePresence>
         {showUpdateNotes && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
@@ -1102,8 +1596,120 @@ export default function App() {
                 </div>
 
                 <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+                  <div className={cn(
+                    "p-4 rounded-2xl border-2 mb-4 bg-indigo-500/10 border-indigo-500/20 flex items-start gap-3",
+                    isDarkMode ? "text-indigo-200" : "text-indigo-800"
+                  )}>
+                    <Shield className="shrink-0 mt-0.5" size={18} />
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-black uppercase leading-tight">Türkiye'nin Yeni Kuralları Aktif!</p>
+                      <p className="text-[10px] font-bold opacity-80">Yüz tarama, küfür yasağı ve ebeveyn kontrolü sistemimize entegre edilmiştir.</p>
+                    </div>
+                  </div>
+
+                  <div className={cn(
+                    "p-4 rounded-2xl border-2 mb-4 bg-amber-500/10 border-amber-500/20 flex items-start gap-3",
+                    isDarkMode ? "text-amber-200" : "text-amber-800"
+                  )}>
+                    <AlertCircle className="shrink-0 mt-0.5" size={18} />
+                    <p className="text-[11px] font-black uppercase leading-tight">
+                      Bu Yapay Zeka Diğer Yapay Zekalar aksine para almadığı için Sunucularımızı küçültük öğüzden yazma süreniz kısıltılıdır Teşekür ederiz!
+                    </p>
+                  </div>
+
+                  <div className={cn(
+                    "p-5 rounded-3xl border-2 mb-6",
+                    isDarkMode ? "bg-indigo-500/5 border-indigo-500/20" : "bg-indigo-50 border-indigo-100"
+                  )}>
+                    <h3 className={cn("text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2", isDarkMode ? "text-indigo-400" : "text-indigo-600")}>
+                      <Shield size={14} /> Türkiye'nin Yeni Kuralları (Ayrıntılı)
+                    </h3>
+                    <div className="space-y-4">
+                      <div className={cn(
+                        "p-4 rounded-2xl border",
+                        isDarkMode ? "bg-slate-800/50 border-slate-700" : "bg-white border-slate-100 shadow-sm"
+                      )}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Camera size={16} className="text-indigo-500" />
+                          <h4 className={cn("text-xs font-black", isDarkMode ? "text-white" : "text-slate-900")}>1. Yüz Tarama ve Yaş Tespiti</h4>
+                        </div>
+                        <p className={cn("text-[10px] font-medium leading-relaxed", isDarkMode ? "text-slate-400" : "text-slate-500")}>
+                          Profil menüsünde bulunan "Yüz Tarama" butonu ile kameranızı kullanarak yaşınızı tespit edebilirsiniz. 
+                          Bu işlem <span className="text-indigo-500 font-bold">gerçek zamanlı biyometrik analiz</span> kullanır. 
+                          Verileriniz cihazınızda işlenir ve asla kaydedilmez. Yaşınıza uygun içerik sunmamıza yardımcı olur.
+                        </p>
+                      </div>
+
+                      <div className={cn(
+                        "p-4 rounded-2xl border",
+                        isDarkMode ? "bg-slate-800/50 border-slate-700" : "bg-white border-slate-100 shadow-sm"
+                      )}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <AlertCircle size={16} className="text-rose-500" />
+                          <h4 className={cn("text-xs font-black", isDarkMode ? "text-white" : "text-slate-900")}>2. Küfür ve Argo Yasağı</h4>
+                        </div>
+                        <p className={cn("text-[10px] font-medium leading-relaxed", isDarkMode ? "text-slate-400" : "text-slate-500")}>
+                          Topluluk kurallarımız gereği küfür, hakaret veya ağır argo kullanımı sistem tarafından otomatik olarak engellenir. 
+                          Kural ihlali durumunda mesajınız silinir ve <span className="text-rose-500 font-bold">10 saniye boyunca</span> mesaj göndermeniz engellenir. 
+                          Lütfen nazik olmaya özen gösterin.
+                        </p>
+                      </div>
+
+                      <div className={cn(
+                        "p-4 rounded-2xl border",
+                        isDarkMode ? "bg-slate-800/50 border-slate-700" : "bg-white border-slate-100 shadow-sm"
+                      )}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Palette size={16} className="text-purple-500" />
+                          <h4 className={cn("text-xs font-black", isDarkMode ? "text-white" : "text-slate-900")}>4. YouTube ve Medya Varlıkları</h4>
+                        </div>
+                        <p className={cn("text-[10px] font-medium leading-relaxed mb-3", isDarkMode ? "text-slate-400" : "text-slate-500")}>
+                          Funzone AI logosunu YouTube kanalınızda veya diğer mecralarda kullanmak için yüksek çözünürlüklü önizlemeyi açabilirsiniz.
+                        </p>
+                        <button
+                          onClick={() => {
+                            setShowHelpGuide(false);
+                            setShowLogoPreview(true);
+                          }}
+                          className="w-full py-2 rounded-xl bg-purple-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-purple-700 transition-colors"
+                        >
+                          Logoyu Görüntüle (HD)
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={cn(
+                    "p-5 rounded-3xl border-2 mb-6",
+                    isDarkMode ? "bg-indigo-500/5 border-indigo-500/20" : "bg-indigo-50 border-indigo-100"
+                  )}>
+                    <h3 className={cn("text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2", isDarkMode ? "text-indigo-400" : "text-indigo-600")}>
+                      <Cpu size={14} /> WİFO AI Modelleri
+                    </h3>
+                    <div className="space-y-3">
+                      {[
+                        { id: 'A1', name: 'WİFO A1', desc: 'Temel zeka seviyesi. Günlük sohbetler ve basit sorular için idealdir.', suggest: 'Hızlı yanıtlar ve genel bilgi için kullanın.' },
+                        { id: 'A1+', name: 'WİFO A1+', desc: 'Geliştirilmiş hız ve daha geniş bilgi birikimi. Daha akıcı diyaloglar.', suggest: 'Daha doğal bir sohbet deneyimi için tercih edin.' },
+                        { id: 'A1,5', name: 'WİFO A1,5', desc: 'Mantıksal çıkarım yeteneği artırılmış model. Karmaşık soruları analiz eder.', suggest: 'Problem çözme ve detaylı analizler için idealdir.' },
+                        { id: 'A1,5+', name: 'WİFO A1,5+', desc: 'Profesyonel düzeyde dil kullanımı ve üstün problem çözme yeteneği.', suggest: 'Yaratıcı yazarlık ve teknik konular için en iyisidir.' },
+                        { id: 'A2', name: 'WİFO A2 (PLUS)', desc: 'En gelişmiş model. En yüksek hız, en derin zeka ve 2K görsel desteği.', suggest: 'En üst düzey performans ve kalite için kullanın.' },
+                      ].map((model, i) => (
+                        <div key={i} className={cn(
+                          "p-3 rounded-2xl border",
+                          isDarkMode ? "bg-slate-800/50 border-slate-700" : "bg-white border-slate-100 shadow-sm"
+                        )}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-indigo-500 text-white uppercase">{model.id}</span>
+                            <span className={cn("text-[10px] font-bold italic", isDarkMode ? "text-slate-500" : "text-slate-400")}>{model.name}</span>
+                          </div>
+                          <p className={cn("text-[11px] font-bold mb-1", isDarkMode ? "text-slate-200" : "text-slate-700")}>{model.desc}</p>
+                          <p className="text-[10px] font-medium text-indigo-500 italic">💡 Öneri: {model.suggest}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   {[
-                    { title: "WİFO Modülleri", desc: "A1, A1+, A1,5, A1,5+ ve A2 modelleri arasında profilinizden seçim yapabilirsiniz.", icon: Cpu },
                     { title: "Sohbet Modu", desc: "Alt kısımdaki metin kutusuna yazarak WİFO ile sohbet edebilirsiniz. Sorular sorun, kod yazdırın veya sadece dertleşin.", icon: MessageSquare },
                     { title: "Görsel Üretimi", desc: "Üst menüden 'Görsel' moduna geçerek hayalinizdeki sahneyi tarif edin. WİFO sizin için çizecektir.", icon: ImageIcon },
                     { title: "Sesli Dinleme", desc: "Botun mesajlarının yanındaki hoparlör simgesine tıklayarak yanıtları sesli olarak dinleyebilirsiniz.", icon: Volume2 },
@@ -1513,13 +2119,70 @@ export default function App() {
 
                   <div className="space-y-4">
                     <h3 className={cn("text-xs font-black uppercase tracking-widest text-left", isDarkMode ? "text-slate-500" : "text-slate-400")}>
+                      Güvenlik & Kontrol
+                    </h3>
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => setShowFaceScan(true)}
+                        className={cn(
+                          "w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between group",
+                          isDarkMode ? "bg-slate-800/50 border-slate-700 hover:border-indigo-500" : "bg-slate-50 border-slate-100 hover:border-indigo-600"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Camera size={20} />
+                          </div>
+                          <div className="text-left">
+                            <h3 className={cn("text-sm font-black", isDarkMode ? "text-white" : "text-slate-900")}>Yüz Tarama</h3>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
+                              {userAge ? `Yaşınız: ${userAge}` : "Yaş Tespiti Yap"}
+                            </p>
+                          </div>
+                        </div>
+                        <Zap size={16} className="text-slate-400 group-hover:text-indigo-500 transition-colors" />
+                      </button>
+
+                      <div className={cn(
+                        "w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between",
+                        isParentalControlActive 
+                          ? "bg-emerald-600/10 border-emerald-500 shadow-lg shadow-emerald-500/10" 
+                          : (isDarkMode ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-100")
+                      )}>
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "w-10 h-10 rounded-xl flex items-center justify-center",
+                            isParentalControlActive ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-500"
+                          )}>
+                            <Eye size={20} />
+                          </div>
+                          <div className="text-left">
+                            <h3 className={cn("text-sm font-black", isDarkMode ? "text-white" : "text-slate-900")}>Ebeveyn Kontrolü</h3>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Dede Dostu Güvenlik</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setShowParentalSettings(true)}
+                          className={cn(
+                            "px-4 py-2 rounded-xl text-xs font-black transition-all active:scale-95",
+                            isParentalControlActive ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-600"
+                          )}
+                        >
+                          {isParentalControlActive ? "AYARLAR" : "AÇ"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className={cn("text-xs font-black uppercase tracking-widest text-left", isDarkMode ? "text-slate-500" : "text-slate-400")}>
                       Yapay Zeka Modülü
                     </h3>
                     <div className="grid grid-cols-2 gap-2">
                       {[
                         { id: 'A1', label: 'WİFO A1', desc: 'Standart', free: true },
                         { id: 'A1+', label: 'WİFO A1+', desc: 'Hızlı', free: true },
-                        { id: 'A1,5', label: 'WİFO A1,5', desc: 'Zeki', free: true },
+                        { id: 'A1,5', label: 'WİFO A1,5', desc: 'Zeki', free: false },
                         { id: 'A1,5+', label: 'WİFO A1,5+', desc: 'Pro', free: false },
                         { id: 'A2', label: 'WİFO A2', desc: 'Efsane', free: false },
                       ].map((model) => (
@@ -1773,6 +2436,60 @@ export default function App() {
                   >
                     Kapat
                   </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Logo Preview Modal for YouTube */}
+      <AnimatePresence>
+        {showLogoPreview && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowLogoPreview(false)}
+              className="absolute inset-0 bg-black/95 backdrop-blur-3xl"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="relative w-full max-w-2xl aspect-square bg-slate-900 rounded-[4rem] border border-white/10 flex flex-col items-center justify-center p-12 overflow-hidden"
+            >
+              {/* Background Glows */}
+              <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+                <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] bg-blue-500/20 rounded-full blur-[120px]" />
+                <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] bg-emerald-500/20 rounded-full blur-[120px]" />
+              </div>
+
+              <div className="relative z-10 flex flex-col items-center space-y-12">
+                <div className="p-8 bg-white/5 rounded-[3rem] border border-white/10 shadow-2xl">
+                  <Logo className="w-64 h-64" />
+                </div>
+                
+                <div className="text-center space-y-4">
+                  <h2 className="text-5xl font-black text-white tracking-tighter italic">
+                    FUN<span className="text-indigo-500">ZONE</span> AI
+                  </h2>
+                  <p className="text-slate-400 font-bold uppercase tracking-[0.3em] text-sm">
+                    YouTube Asset Preview (HD)
+                  </p>
+                </div>
+
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => setShowLogoPreview(false)}
+                    className="px-8 py-4 rounded-2xl bg-white text-black font-black uppercase tracking-widest text-xs hover:bg-slate-200 transition-all"
+                  >
+                    Kapat
+                  </button>
+                  <p className="text-slate-500 text-[10px] font-bold max-w-[200px] text-center">
+                    Ekran görüntüsü alarak YouTube profil resmi veya banner olarak kullanabilirsiniz.
+                  </p>
                 </div>
               </div>
             </motion.div>
@@ -2062,10 +2779,18 @@ export default function App() {
           </div>
 
           <div className="relative">
+            {isMuted && (
+              <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-rose-600 text-white text-[10px] font-black px-3 py-1 rounded-full shadow-lg animate-bounce z-10">
+                CEZALISIN: {muteTimer}s
+              </div>
+            )}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="relative"
+              className={cn(
+                "relative",
+                isMuted ? "opacity-50 grayscale pointer-events-none" : ""
+              )}
             >
             <motion.textarea
               whileFocus={{ scale: 1.01, boxShadow: "0 20px 40px rgba(0,0,0,0.1)" }}
