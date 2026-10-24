@@ -22,7 +22,7 @@ export const QuantumEnergyFlowBar: React.FC<QuantumEnergyFlowBarProps> = ({
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [replayKey, setReplayKey] = useState<number>(0);
 
-  // Determine model tier & target Qubit metrics
+  // Determine model tier & target Tensor/QUBİT metrics
   const botLabel = message?.botName || activeAiLevel;
   const isQpu9000 =
     botLabel.includes('Q-PU 9000') ||
@@ -31,19 +31,64 @@ export const QuantumEnergyFlowBar: React.FC<QuantumEnergyFlowBarProps> = ({
   const isA3 =
     !isQpu9000 &&
     (botLabel.includes('A3') || (message?.quantumTelemetry?.qubitsActive ?? 0) >= 1024);
-  const isA2 = !isQpu9000 && !isA3 && botLabel.includes('A2');
+  const isA2Plus = !isQpu9000 && !isA3 && botLabel.includes('A2+');
+  const isA2Minus = !isQpu9000 && !isA3 && !isA2Plus && botLabel.includes('A2-');
+  const isA2 = !isQpu9000 && !isA3 && !isA2Plus && !isA2Minus && botLabel.includes('A2');
+  const isA1Plus = !isQpu9000 && !isA3 && !isA2Plus && !isA2Minus && !isA2 && botLabel.includes('A1+');
+
+  // Tensor Teknolojisi (Ortalama): A1, A1+, A2- | QUBİT Teknolojisi (En İyi): A2, A2+, A3, Q-PU 9000
+  const isTensorTech =
+    message?.quantumTelemetry?.techType === 'TENSOR' ||
+    (!isQpu9000 && !isA3 && !isA2Plus && !isA2);
+  const unitName = isTensorTech ? 'Tensor (Ortalama)' : 'QUBİT (En İyi)';
 
   const maxQubits =
     message?.quantumTelemetry?.qubitsActive ||
-    (isQpu9000 ? 4096 : isA3 ? 1024 : isA2 ? 512 : 256);
+    (isQpu9000
+      ? 4096
+      : isA3
+      ? 1024
+      : isA2Plus
+      ? 768
+      : isA2
+      ? 512
+      : isA2Minus
+      ? 384
+      : isA1Plus
+      ? 256
+      : 128);
 
   const coherence =
     message?.quantumTelemetry?.coherenceRatio ||
-    (isQpu9000 ? '99.999%' : isA3 ? '99.94%' : isA2 ? '99.40%' : '98.80%');
+    (isQpu9000
+      ? '99.999%'
+      : isA3
+      ? '99.94%'
+      : isA2Plus
+      ? '99.25%'
+      : isA2
+      ? '98.60%'
+      : isA2Minus
+      ? '97.50%'
+      : isA1Plus
+      ? '96.40%'
+      : '94.20%');
 
   const clockFlux =
     message?.quantumTelemetry?.quantumFlux ||
-    (isQpu9000 ? '12.8 THz · Hiper-Akış' : isA3 ? '4.2 THz · Süperpozisyon' : isA2 ? '2.4 THz · VIP Kanal' : '1.2 THz · Standart');
+    (isQpu9000
+      ? '12.8 THz · 1sn QUBİT'
+      : isA3
+      ? '5.2 THz · 5sn QUBİT'
+      : isA2Plus
+      ? '3.6 THz · 8sn QUBİT'
+      : isA2
+      ? '2.4 THz · 10sn QUBİT'
+      : isA2Minus
+      ? '1.9 THz · 15sn Tensor'
+      : isA1Plus
+      ? '1.5 THz · 16sn Tensor'
+      : '1.1 THz · 20sn Tensor');
 
   // Compute deterministic energy value based on content length and Qubits
   const charCount = message?.content?.length || 180;
@@ -141,13 +186,13 @@ export const QuantumEnergyFlowBar: React.FC<QuantumEnergyFlowBarProps> = ({
           </span>
 
           <span className={`font-display font-bold tracking-tight ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-            Kuantum Enerji Çubuğu
+            {isTensorTech ? 'Tensor Enerji Çubuğu' : 'QUBİT Enerji Çubuğu'}
           </span>
 
           <span className="text-slate-500" aria-hidden="true">·</span>
 
           <span className={`font-mono font-semibold tabular-nums ${accentTextClass}`}>
-            {displayedQubits} / {maxQubits} Qubit
+            {displayedQubits} / {maxQubits} {unitName}
           </span>
 
           <span className="hidden sm:inline text-slate-500" aria-hidden="true">·</span>

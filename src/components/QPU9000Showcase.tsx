@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Crown,
-  Lock,
   Volume2,
   VolumeX,
   Zap,
@@ -11,6 +10,12 @@ import {
   FastForward,
   Cpu,
   CheckCircle2,
+  Timer,
+  Play,
+  Film,
+  Globe,
+  Atom,
+  X,
 } from 'lucide-react';
 
 interface QPU9000ShowcaseProps {
@@ -18,66 +23,93 @@ interface QPU9000ShowcaseProps {
   onUnlockAsFounder: () => void;
   onFinishToStartScreen: () => void;
   onSelectQpuProcessor: () => void;
+  onCloseModal?: () => void;
 }
+
+type VideoStage = 'white_entry' | 'quote' | 'architecture' | 'duel' | 'finale';
 
 const PROMPT_TEXT =
-  'Sorgu: Çok boyutlu kuantum kriptografi matrisini çöz, 4096-Qubit mimari optimizasyon kodunu üret ve gerçek zamanlı simülasyon raporunu derle.';
+  'Sorgu: Çok boyutlu kuantum kriptografi matrisini çöz, 4096-QUBİT mimari optimizasyon kodunu üret ve gerçek zamanlı simülasyon raporunu derle.';
 
-const A3_RESPONSE_TEXT = `WİFO A3 QUANTUM [64-Qubit NPU] Analizi Başlatıldı...
-> Katman 1: Matris ayrıştırma işlemi yürütülüyor...
-> Katman 2: Standart süperpozisyon düğümleri hesaplanıyor...
-> Uyarı: 64-Qubit bant genişliği sınırına yaklaşıldı.
-> Kod bloğu oluşturuluyor:
-function optimizeA3Matrix(nodes) {
-  return nodes.map(n => n.coherence * 0.994);
+const A2_RESPONSE_TEXT = `WİFO A2 VIP [512-QUBİT · En İyi Teknoloji] — 10 Saniye Kalibre Akış
+> Katman 1: Çok boyutlu QUBİT kriptografi düğümleri taranıyor...
+> Katman 2: QUBİT blokları senkronize ediliyor (%98.60 Koherans)...
+> Katman 3: Optimizasyon fonksiyonu:
+function optimizeA2Qubit(matrix) {
+  return matrix.map(cell => cell.flux * 0.986);
 }
-> Sonuç: Temel optimizasyon tamamlandı ancak tam ölçekli simülasyon için ek işlem süresi gerekiyor.`;
+> Sonuç: WİFO A2 VIP (QUBİT) analizi tam 10.0 saniyede tamamlandı.`;
 
-const QPU_RESPONSE_TEXT = `Q-PU 9000 SERIES [4096-Qubit Hyper-Core] — ANINDA ÇÖZÜLDÜ (0.0003ms)
+const A2_PLUS_RESPONSE_TEXT = `WİFO A2+ [768-QUBİT · En İyi Teknoloji] — 8 Saniye Turbo QUBİT Akış
+> Katman 1: 768-QUBİT paralel süperpozisyon kanalı devrede (%99.25 Koherans)...
+> Katman 2: Yeni nesil A2+ QUBİT motoru Tensor serisini geride bıraktı...
+> Katman 3: Çekirdek kodu:
+function executeA2PlusQubit(nodes) {
+  return QubitEngine.accelerate(nodes, { qubits: 768, targetSec: 8.0 });
+}
+> Sonuç: WİFO A2+ (QUBİT) analizi tam 8.0 saniyede tamamlandı!`;
+
+const A3_RESPONSE_TEXT = `WİFO A3 QUANTUM [1024-QUBİT · En İyi Teknoloji] — 5 Saniye Kuantum Akış
+> Katman 1: 1024-QUBİT paralel süperpozisyon matrisi devrede (%99.94 Koherans)...
+> Katman 2: Kuantum kriptografi denklemi 2x hızlandırılmış darbe ile çözüldü...
+> Katman 3: Çekirdek kodu:
+function executeA3Quantum(nodes) {
+  return QuantumCore.superpose(nodes, { qubits: 1024, targetSec: 5.0 });
+}
+> Sonuç: WİFO A3 QUANTUM analizi tam 5.0 saniyede yüksek hassasiyetle tamamlandı.`;
+
+const QPU_RESPONSE_TEXT = `Q-PU 9000 SERIES [4096-QUBİT · EN İYİ ZİRVE] — 1 SANİYEDE ÇÖZÜLDÜ (1.0s)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[✓] 4096-Qubit Hiper-Örgü Senkronizasyonu: %99.9999 Koherans
-[✓] Çok Boyutlu Kriptografi Matrisi: Tek Döngüde Kırıldı ve Yeniden Şifrelendi
-[✓] Kuantum Çekirdek Kodu (12.8 THz):
+[✓] 4096-QUBİT Hiper-Örgü Senkronizasyonu: %99.9999 Koherans
+[✓] Çok Boyutlu Kriptografi Matrisi: Tek Döngüde Kırıldı
+[✓] Kuantum Çekirdek Kodu (12.8 THz · 1 Saniye Hiper-Yazım):
 
 class QPU9000HyperEngine {
   readonly qubits = 4096;
-  readonly clockSpeed = "12.8 THz";
-  executeOmniMatrix(tensorField: Float64Array): QuantumState {
-    return TensorCore.entangleAll(tensorField, { zeroLatency: true, fidelity: 1.0 });
-  }
+  readonly tech = "QUBİT (En İyi)";
+  readonly writeSpeed = "1.0 Saniye";
 }
 
-[✓] SİMÜLASYON RAPORU: A3 Quantum'a kıyasla 32.8x daha yüksek hız, sıfır gecikme, tam otonom kuantum üstünlüğü doğrulandı.`;
+[✓] SİMÜLASYON RAPORU: Tensor (A1 20sn, A1+ 16sn, A2- 15sn) ve QUBİT (A2 10sn, A2+ 8sn, A3 5sn) serisinin zirvesi!`;
 
 export const QPU9000Showcase: React.FC<QPU9000ShowcaseProps> = ({
   isFounder,
   onUnlockAsFounder,
   onFinishToStartScreen,
   onSelectQpuProcessor,
+  onCloseModal,
 }) => {
-  // Stages:
-  // 0: Initial Pure White Screen (#FFFFFF) -> Smoothly fades to Pure Black (#000000)
-  // 1: Center Statement ("A SERİES Güç ve Hızlılık olarak Güçlenmiyicek ama.. Q-PU Series Herşeyiyle değişicek..")
-  // 2: Dual AI Typing Speed Comparison (A3 Quantum vs Q-PU 9000 Series)
-  // 3: Grand Finale ("FUNZONE QUANTUM SERİES")
-  const [stage, setStage] = useState<'white_entry' | 'quote' | 'duel' | 'finale'>('white_entry');
+  const [stage, setStage] = useState<VideoStage>('white_entry');
   const [isDarkBg, setIsDarkBg] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const [videoRunKey, setVideoRunKey] = useState(0);
+  const [duelRunId, setDuelRunId] = useState(0);
 
-  // Typing states for Stage 2
+  // Typing states for Duel Stage (Calibrated to exact 20s, 16s, 15s, 10s, 8s, 5s, and 1s!)
+  const [a2Typed, setA2Typed] = useState('');
+  const [a2PlusTyped, setA2PlusTyped] = useState('');
   const [a3Typed, setA3Typed] = useState('');
   const [qpuTyped, setQpuTyped] = useState('');
-  const [countdown, setCountdown] = useState<number | null>(null);
+
+  const [a1Elapsed, setA1Elapsed] = useState(0);
+  const [a1PlusElapsed, setA1PlusElapsed] = useState(0);
+  const [a2MinusElapsed, setA2MinusElapsed] = useState(0);
+  const [a2Elapsed, setA2Elapsed] = useState(0);
+  const [a2PlusElapsed, setA2PlusElapsed] = useState(0);
+  const [a3Elapsed, setA3Elapsed] = useState(0);
+  const [qpuElapsed, setQpuElapsed] = useState(0);
 
   // Web Audio API synth refs
   const audioCtxRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
   const sequencerIntervalRef = useRef<number | null>(null);
 
-  // Start procedural cinematic synth music
   const startBackgroundMusic = () => {
     try {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (!AudioCtx) return;
 
       if (audioCtxRef.current) {
@@ -92,8 +124,7 @@ export const QPU9000Showcase: React.FC<QPU9000ShowcaseProps> = ({
       masterGain.connect(ctx.destination);
       masterGainRef.current = masterGain;
 
-      // Deep ambient pad chord (D minor 9th cyberpunk / quantum vibe)
-      const padFreqs = [146.83, 220.0, 261.63, 329.63]; // D3, A3, C4, E4
+      const padFreqs = [146.83, 220.0, 261.63, 329.63];
       padFreqs.forEach((freq, idx) => {
         const osc = ctx.createOscillator();
         const padGain = ctx.createGain();
@@ -108,23 +139,20 @@ export const QPU9000Showcase: React.FC<QPU9000ShowcaseProps> = ({
         osc.start();
       });
 
-      // Arpeggiator + Bass pulse sequence
-      const arpNotes = [293.66, 349.23, 440.0, 523.25, 587.33, 523.25, 440.0, 349.23]; // D4, F4, A4, C5, D5...
-      const bassNotes = [73.42, 73.42, 58.27, 65.41]; // D2, D2, Bb1, C2
+      const arpNotes = [293.66, 349.23, 440.0, 523.25, 587.33, 523.25, 440.0, 349.23];
+      const bassNotes = [73.42, 73.42, 58.27, 65.41];
       let step = 0;
 
       sequencerIntervalRef.current = window.setInterval(() => {
         if (!audioCtxRef.current || audioCtxRef.current.state !== 'running') return;
         const now = audioCtxRef.current.currentTime;
 
-        // Pluck Arp Note
         const arpOsc = audioCtxRef.current.createOscillator();
         const arpGain = audioCtxRef.current.createGain();
         arpOsc.type = 'sawtooth';
         const noteFreq = arpNotes[step % arpNotes.length];
         arpOsc.frequency.setValueAtTime(noteFreq, now);
 
-        // Lowpass filter for warm synth pluck
         const filter = audioCtxRef.current.createBiquadFilter();
         filter.type = 'lowpass';
         filter.frequency.setValueAtTime(1400, now);
@@ -140,7 +168,6 @@ export const QPU9000Showcase: React.FC<QPU9000ShowcaseProps> = ({
         arpOsc.start(now);
         arpOsc.stop(now + 0.25);
 
-        // Deep Sub-Bass pulse every 4 steps
         if (step % 4 === 0) {
           const bassOsc = audioCtxRef.current.createOscillator();
           const bassGain = audioCtxRef.current.createGain();
@@ -161,7 +188,7 @@ export const QPU9000Showcase: React.FC<QPU9000ShowcaseProps> = ({
         step++;
       }, 240);
     } catch {
-      // Ignore audio autoplay errors if browser blocks
+      // Ignore audio autoplay restrictions
     }
   };
 
@@ -176,7 +203,6 @@ export const QPU9000Showcase: React.FC<QPU9000ShowcaseProps> = ({
     }
   };
 
-  // Toggle mute
   const toggleMute = () => {
     setIsMuted((prev) => {
       const next = !prev;
@@ -187,329 +213,612 @@ export const QPU9000Showcase: React.FC<QPU9000ShowcaseProps> = ({
     });
   };
 
-  // Main choreographed timeline when Founder is authenticated
+  // Classic Original Video Choreographed Timeline — Open to ALL Users!
   useEffect(() => {
-    if (!isFounder) return;
-
     setStage('white_entry');
     setIsDarkBg(false);
+    setA2Typed('');
+    setA2PlusTyped('');
     setA3Typed('');
     setQpuTyped('');
-    setCountdown(null);
 
     startBackgroundMusic();
 
-    // 1) Start Pure White (#FFFFFF), then smoothly transition to Black (#000000)
     const tDark = window.setTimeout(() => {
       setIsDarkBg(true);
-    }, 350);
+    }, 400);
 
-    // 2) Show the Quote in the center of the screen
+    if (!isAutoPlaying) {
+      return () => {
+        clearTimeout(tDark);
+      };
+    }
+
     const tQuote = window.setTimeout(() => {
       setStage('quote');
-    }, 1800);
+    }, 2400);
 
-    // 3) Transition to the 2 AI Chats Typing Speed Duel
+    const tArch = window.setTimeout(() => {
+      setStage('architecture');
+    }, 7200);
+
     const tDuel = window.setTimeout(() => {
       setStage('duel');
-    }, 7600);
+    }, 12500);
 
-    // 4) Transition to "FUNZONE QUANTUM SERİES" Finale
     const tFinale = window.setTimeout(() => {
       setStage('finale');
-      setCountdown(4);
-    }, 17500);
-
-    // 5) Automatically return to Start Screen ("Başlama Yerine geri atıcak")
-    const tFinish = window.setTimeout(() => {
-      stopBackgroundMusic();
-      onSelectQpuProcessor();
-      onFinishToStartScreen();
-    }, 22000);
+    }, 24000);
 
     return () => {
       clearTimeout(tDark);
       clearTimeout(tQuote);
+      clearTimeout(tArch);
       clearTimeout(tDuel);
       clearTimeout(tFinale);
-      clearTimeout(tFinish);
       stopBackgroundMusic();
     };
-  }, [isFounder]);
+  }, [videoRunKey]);
 
-  // Typing animation for Stage 2 ('duel')
+  const handleRestartFullVideo = () => {
+    setIsAutoPlaying(true);
+    setVideoRunKey((prev) => prev + 1);
+  };
+
+  const handleJumpToStage = (targetStage: VideoStage) => {
+    setIsAutoPlaying(false);
+    setIsDarkBg(true);
+    setStage(targetStage);
+    if (targetStage === 'duel') {
+      setDuelRunId((prev) => prev + 1);
+    }
+  };
+
+  // Exact time-calibrated typing animation for Duel Stage:
+  // Q-PU 9000 SERIES = 1.00 second (1000 ms) [QUBİT - En İyi]
+  // WİFO A3 QUANTUM  = 5.00 seconds (5000 ms) [QUBİT - En İyi]
+  // WİFO A2+         = 8.00 seconds (8000 ms) [QUBİT - En İyi]
+  // WİFO A2 VIP      = 10.00 seconds (10000 ms) [QUBİT - En İyi]
+  // Plus live Tensor progress bars for WİFO A2- (15.0s), WİFO A1+ (16.0s), and WİFO A1 (20.0s) [Tensor - Ortalama]
   useEffect(() => {
     if (stage !== 'duel') return;
 
+    setA2Typed('');
+    setA2PlusTyped('');
     setA3Typed('');
     setQpuTyped('');
+    setA1Elapsed(0);
+    setA1PlusElapsed(0);
+    setA2MinusElapsed(0);
+    setA2Elapsed(0);
+    setA2PlusElapsed(0);
+    setA3Elapsed(0);
+    setQpuElapsed(0);
 
-    // Q-PU 9000 types hyper-fast (18 chars per 16ms -> finishes in ~0.8 seconds!)
-    let qpuIndex = 0;
-    const qpuInterval = window.setInterval(() => {
-      qpuIndex += 18;
-      if (qpuIndex >= QPU_RESPONSE_TEXT.length) {
-        setQpuTyped(QPU_RESPONSE_TEXT);
-        clearInterval(qpuInterval);
-      } else {
-        setQpuTyped(QPU_RESPONSE_TEXT.slice(0, qpuIndex));
+    const startTime = performance.now();
+
+    const tick = window.setInterval(() => {
+      const elapsedMs = performance.now() - startTime;
+      const elapsedSec = elapsedMs / 1000;
+
+      // 1) Q-PU 9000 SERIES: 1000ms (1.0s)
+      const qpuRatio = Math.min(1, elapsedMs / 1000);
+      setQpuElapsed(Math.min(1.0, elapsedSec));
+      setQpuTyped(QPU_RESPONSE_TEXT.slice(0, Math.floor(qpuRatio * QPU_RESPONSE_TEXT.length)));
+
+      // 2) WİFO A3 QUANTUM: 5000ms (5.0s)
+      const a3Ratio = Math.min(1, elapsedMs / 5000);
+      setA3Elapsed(Math.min(5.0, elapsedSec));
+      setA3Typed(A3_RESPONSE_TEXT.slice(0, Math.floor(a3Ratio * A3_RESPONSE_TEXT.length)));
+
+      // 3) WİFO A2+ (New): 8000ms (8.0s)
+      const a2PlusRatio = Math.min(1, elapsedMs / 8000);
+      setA2PlusElapsed(Math.min(8.0, elapsedSec));
+      setA2PlusTyped(
+        A2_PLUS_RESPONSE_TEXT.slice(0, Math.floor(a2PlusRatio * A2_PLUS_RESPONSE_TEXT.length))
+      );
+
+      // 4) WİFO A2 VIP: 10000ms (10.0s)
+      const a2Ratio = Math.min(1, elapsedMs / 10000);
+      setA2Elapsed(Math.min(10.0, elapsedSec));
+      setA2Typed(A2_RESPONSE_TEXT.slice(0, Math.floor(a2Ratio * A2_RESPONSE_TEXT.length)));
+
+      // 5) Tensor (Ortalama) reference meters: A2- (15.0s), A1+ (16.0s), A1 (20.0s)
+      setA2MinusElapsed(Math.min(15.0, elapsedSec));
+      setA1PlusElapsed(Math.min(16.0, elapsedSec));
+      setA1Elapsed(Math.min(20.0, elapsedSec));
+
+      if (elapsedMs >= 20000) {
+        clearInterval(tick);
       }
-    }, 18);
+    }, 30);
 
-    // A3 Quantum types at standard human-readable AI speed (2 chars per 45ms -> takes ~8.5 seconds)
-    let a3Index = 0;
-    const a3Interval = window.setInterval(() => {
-      a3Index += 2;
-      if (a3Index >= A3_RESPONSE_TEXT.length) {
-        setA3Typed(A3_RESPONSE_TEXT);
-        clearInterval(a3Interval);
-      } else {
-        setA3Typed(A3_RESPONSE_TEXT.slice(0, a3Index));
-      }
-    }, 45);
-
-    return () => {
-      clearInterval(qpuInterval);
-      clearInterval(a3Interval);
-    };
-  }, [stage]);
-
-  // Countdown tick during Finale stage
-  useEffect(() => {
-    if (stage !== 'finale' || countdown === null) return;
-    const timer = window.setInterval(() => {
-      setCountdown((prev) => (prev && prev > 1 ? prev - 1 : prev));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [stage, countdown]);
-
-  // Founder-only Lock Gate if current user is not Founder
-  if (!isFounder) {
-    return (
-      <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-12 bg-slate-950 text-white flex items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="max-w-lg w-full rounded-3xl p-8 bg-slate-900/90 border border-amber-500/30 shadow-2xl text-center"
-        >
-          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto mb-5 text-amber-400">
-            <Lock className="w-8 h-8" />
-          </div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold mb-3">
-            <Crown className="w-3.5 h-3.5" />
-            SADECE KURUCU ERİŞİMİ (FOUNDER ONLY)
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-2">
-            Q-PU 9000 Series Gizli İnceleme Alanı
-          </h2>
-          <p className="text-sm text-slate-400 leading-relaxed mb-6">
-            Bu yeni nesil kuantum işlemciye ve sinematik hız karşılaştırmasına yalnızca kurucu{' '}
-            <span className="text-amber-300 font-semibold">FE OWNER BATUHAN</span> erişebilir.
-          </p>
-
-          <button
-            onClick={onUnlockAsFounder}
-            className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950 font-bold text-sm shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
-          >
-            <Crown className="w-4 h-4" />
-            <span>Kurucu Olarak Giriş Yap (FE OWNER BATUHAN) ve Başlat</span>
-          </button>
-        </motion.div>
-      </div>
-    );
-  }
+    return () => clearInterval(tick);
+  }, [stage, duelRunId]);
 
   return (
     <div
-      className={`relative flex-1 overflow-y-auto flex flex-col justify-between transition-colors duration-[2200ms] ease-in-out select-none ${
+      className={`relative flex-1 overflow-y-auto flex flex-col justify-between transition-colors duration-[2000ms] ease-in-out select-none min-h-[640px] ${
         isDarkBg ? 'bg-black text-white' : 'bg-white text-slate-900'
       }`}
     >
-      {/* Subtle Ambient Quantum Glow in Black Mode */}
       {isDarkBg && (
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[650px] h-[650px] rounded-full bg-amber-500/10 blur-[150px]" />
-          <div className="absolute top-1/4 right-1/4 w-[400px] h-[400px] rounded-full bg-rose-500/10 blur-[130px]" />
+          <div className="absolute top-1/4 right-1/4 w-[400px] h-[400px] rounded-full bg-cyan-500/10 blur-[130px]" />
+          <div className="absolute bottom-1/4 left-1/4 w-[420px] h-[420px] rounded-full bg-rose-500/10 blur-[130px]" />
         </div>
       )}
 
-      {/* Top Control Bar */}
-      <div className="relative z-20 flex items-center justify-between px-6 py-4 border-b border-white/10">
-        <div className="flex items-center gap-3">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold tracking-wider uppercase">
-            <Crown className="w-3.5 h-3.5" />
-            Q-PU 9000 SERIES • KURUCU İNCELEMESİ
+      {/* Top Control Bar — Explicitly Open to ALL Users */}
+      <div className="relative z-20 flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-white/10 bg-slate-950/60 backdrop-blur-md">
+        <div className="flex flex-wrap items-center gap-2.5 text-xs">
+          <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold flex items-center gap-1.5">
+            <Globe className="w-3.5 h-3.5" />
+            <span>TÜM KULLANICILARA AÇIK</span>
           </span>
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            Arka Plan Müziği Aktif
+
+          <span className="text-amber-300 font-bold flex items-center gap-1.5">
+            <Film className="w-3.5 h-3.5" />
+            <span>ESKİ ORİJİNAL SİNEMATİK VİDEO & 7 İŞLEMCİ HIZ VİTRİNİ</span>
           </span>
+
+          {!isFounder && (
+            <button
+              type="button"
+              onClick={onUnlockAsFounder}
+              className="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 font-semibold transition-colors cursor-pointer"
+            >
+              Kurucu Modunu da Aç (FE OWNER BATUHAN)
+            </button>
+          )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={toggleMute}
-            className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-medium text-white flex items-center gap-1.5 transition-colors cursor-pointer"
-            title={isMuted ? 'Sesi Aç' : 'Sesi Kapat'}
+            type="button"
+            onClick={handleRestartFullVideo}
+            className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-xs font-bold text-amber-300 flex items-center gap-1.5 transition-all cursor-pointer"
           >
-            {isMuted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
-            <span>{isMuted ? 'Sesi Aç' : 'Şarkı Çalıyor'}</span>
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Eski Videoyu Baştan Oynat</span>
           </button>
 
-          {stage !== 'finale' && (
+          {stage === 'duel' && (
             <button
+              type="button"
+              onClick={() => setDuelRunId((prev) => prev + 1)}
+              className="px-3 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-xs font-medium text-cyan-200 flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <Play className="w-3.5 h-3.5" />
+              <span>Hız Yarışını Tekrarlat</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={toggleMute}
+            className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer text-white"
+          >
+            {isMuted ? (
+              <>
+                <VolumeX className="w-3.5 h-3.5 text-rose-400" />
+                <span>Sesi Aç</span>
+              </>
+            ) : (
+              <>
+                <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Müzik Aktif</span>
+              </>
+            )}
+          </button>
+
+          {onCloseModal ? (
+            <button
+              type="button"
               onClick={() => {
-                setStage('finale');
-                setCountdown(3);
+                stopBackgroundMusic();
+                onCloseModal();
               }}
-              className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-medium text-slate-300 flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-xs font-bold text-rose-200 flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Videoyu Kapat</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                stopBackgroundMusic();
+                onSelectQpuProcessor();
+                onFinishToStartScreen();
+              }}
+              className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-xs font-bold text-amber-300 flex items-center gap-1.5 transition-all cursor-pointer"
             >
               <FastForward className="w-3.5 h-3.5" />
-              <span>Finale Geç</span>
+              <span>Başlama Yerine Geç</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Main Center Stage */}
-      <div className="relative z-10 flex-1 flex items-center justify-center px-6 py-8">
+      {/* Center Stage Content */}
+      <div className="relative z-10 flex-1 flex items-center justify-center px-4 sm:px-8 py-8">
         <AnimatePresence mode="wait">
-          {/* STAGE 0: White to Black smooth transition */}
+          {/* STAGE 1: Classic White-to-Black Cinematic Entry */}
           {stage === 'white_entry' && (
             <motion.div
               key="white_entry"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.8 }}
-              className="text-center"
+              initial={{ opacity: 0, scale: 0.92 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.06 }}
+              transition={{ duration: 0.9 }}
+              className="text-center max-w-3xl mx-auto px-4"
             >
-              <div className="text-xs font-mono uppercase tracking-[0.4em] opacity-60">
-                Q-PU 9000 SERIES • KUANTUM GEÇİŞİ BAŞLATILIYOR
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-mono uppercase tracking-widest mb-5">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>SAHNE 01 · WİFO ŞİRKETİ SİNEMATİK SUNUMU (HERKESE AÇIK)</span>
               </div>
+              <h1 className="text-3xl sm:text-5xl md:text-6xl font-black tracking-tight mb-4">
+                BEYAZDAN SİYAHA KUANTUM DOĞUŞU
+              </h1>
+              <p className="text-sm sm:text-base text-slate-400 max-w-xl mx-auto">
+                Kurucu <strong className="text-amber-400">FE OWNER BATUHAN</strong> vizyonuyla inşa
+                edilen Tensor (A1, A1+, A2-) ve QUBİT (A2, A2+, A3 Quantum, Q-PU 9000) ailesinin
+                orijinal tanıtım videosu başlıyor...
+              </p>
             </motion.div>
           )}
 
-          {/* STAGE 1: Center Quote */}
+          {/* STAGE 2: Original Manifesto Quote */}
           {stage === 'quote' && (
             <motion.div
               key="quote"
-              initial={{ opacity: 0, scale: 0.92, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 1.04, y: -16 }}
-              transition={{ duration: 1.1, ease: 'easeOut' }}
+              initial={{ opacity: 0, y: 24, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -24, scale: 1.04 }}
+              transition={{ duration: 1.0, ease: 'easeOut' }}
               className="max-w-4xl mx-auto text-center px-4"
             >
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-mono uppercase tracking-widest mb-6">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-mono uppercase tracking-widest mb-6">
                 <Sparkles className="w-3.5 h-3.5" />
-                YENİ ÇAĞ MANİFESTOSU
+                <span>SAHNE 02 · TENSOR (ORTALAMA) DEN QUBİT (EN İYİ) MİMARİSİNE</span>
               </div>
-              <h1 className="text-2xl sm:text-4xl md:text-5xl font-extrabold tracking-tight leading-tight bg-gradient-to-r from-white via-amber-100 to-amber-400 bg-clip-text text-transparent drop-shadow-sm">
-                &ldquo;A SERİES Güç ve Hızlılık olarak Güçlenmiyicek ama.. Q-PU Series Herşeyiyle değişicek..&rdquo;
-              </h1>
+              <h2 className="text-2xl sm:text-4xl md:text-5xl font-extrabold tracking-tight leading-tight bg-gradient-to-r from-white via-amber-100 to-amber-400 bg-clip-text text-transparent">
+                “Tensor işlemciler (A1, A1+, A2-) ortalama hızda matrisleri işler; QUBİT işlemciler
+                (A2, A2+, A3, Q-PU 9000) ise süperpozisyonla en iyi geleceği yazar.”
+              </h2>
+              <p className="mt-6 text-sm text-amber-300/80 font-mono tracking-widest uppercase">
+                — FE OWNER BATUHAN · WİFO ŞİRKETİ KURUCUSU
+              </p>
             </motion.div>
           )}
 
-          {/* STAGE 2: 2 AI Chats Typing Speed Comparison (A3 Quantum vs Q-PU 9000) */}
+          {/* STAGE 3: 7-Model Architecture Scene (Tensor vs QUBİT) */}
+          {stage === 'architecture' && (
+            <motion.div
+              key="architecture"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.7 }}
+              className="w-full max-w-6xl mx-auto space-y-5"
+            >
+              <div className="text-center space-y-2">
+                <div className="inline-flex items-center gap-2 text-xs font-mono text-cyan-300">
+                  <Atom className="w-4 h-4" />
+                  <span>SAHNE 03 · 7 KADEMELİ TENSOR (ORTALAMA) & QUBİT (EN İYİ) HİYERARŞİSİ</span>
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
+                  Tensor (A1 · A1+ · A2-) ve QUBİT (A2 · A2+ · A3 · Q-PU 9000) Ailesi
+                </h2>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+                {[
+                  {
+                    name: 'WİFO A1',
+                    speed: '20 Saniye',
+                    tech: 'TENSOR · ORTALAMA',
+                    cores: '128 Tensor',
+                    desc: 'Temel Tensor Mantık Çekirdeği',
+                    border: 'border-blue-500/40',
+                    text: 'text-blue-300',
+                    isQubit: false,
+                  },
+                  {
+                    name: 'WİFO A1+',
+                    speed: '16 Saniye',
+                    tech: 'TENSOR · ORTALAMA',
+                    cores: '256 Tensor',
+                    desc: 'Geliştirilmiş Tensor Akış Sistemi',
+                    border: 'border-indigo-500/40',
+                    text: 'text-indigo-300',
+                    isQubit: false,
+                  },
+                  {
+                    name: 'WİFO A2- (Yeni)',
+                    speed: '15 Saniye',
+                    tech: 'TENSOR · ORTALAMA',
+                    cores: '384 Tensor',
+                    desc: 'En Hızlı Tensor İşlemcisi',
+                    border: 'border-sky-400/60',
+                    text: 'text-sky-300',
+                    isQubit: false,
+                  },
+                  {
+                    name: 'WİFO A2',
+                    speed: '10 Saniye',
+                    tech: 'QUBİT · EN İYİ',
+                    cores: '512 QUBİT',
+                    desc: 'Hediye VIP QUBİT Çekirdeği',
+                    border: 'border-emerald-500/50',
+                    text: 'text-emerald-300',
+                    isQubit: true,
+                  },
+                  {
+                    name: 'WİFO A2+ (Yeni)',
+                    speed: '8 Saniye',
+                    tech: 'QUBİT · EN İYİ',
+                    cores: '768 QUBİT',
+                    desc: 'Yeni Nesil Turbo QUBİT Motoru',
+                    border: 'border-purple-400/60',
+                    text: 'text-purple-300',
+                    isQubit: true,
+                  },
+                  {
+                    name: 'WİFO A3 QUANTUM',
+                    speed: '5 Saniye',
+                    tech: 'QUBİT · EN İYİ',
+                    cores: '1024 QUBİT',
+                    desc: 'Amiral Gemisi QUBİT Süperpozisyon',
+                    border: 'border-cyan-400/60',
+                    text: 'text-cyan-300',
+                    isQubit: true,
+                  },
+                  {
+                    name: 'Q-PU 9000',
+                    speed: '1 Saniye',
+                    tech: 'QUBİT · EN İYİ ZİRVE',
+                    cores: '4096 QUBİT',
+                    desc: '12.8 THz Hiper-QUBİT Zirvesi',
+                    border: 'border-amber-400/90',
+                    text: 'text-amber-300',
+                    isQubit: true,
+                  },
+                ].map((item, idx) => (
+                  <div
+                    key={idx}
+                    className={`p-3.5 rounded-2xl bg-slate-900/90 border ${item.border} flex flex-col justify-between`}
+                  >
+                    <div>
+                      <div
+                        className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-mono font-bold mb-1.5 ${
+                          item.isQubit
+                            ? 'bg-emerald-500/20 text-emerald-300'
+                            : 'bg-blue-500/20 text-blue-300'
+                        }`}
+                      >
+                        {item.tech}
+                      </div>
+                      <div className="text-[10px] font-mono text-slate-400">{item.cores}</div>
+                      <div className={`font-display font-bold text-sm mt-0.5 ${item.text}`}>
+                        {item.name}
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">{item.desc}</p>
+                    </div>
+                    <div className="mt-3 pt-2 border-t border-slate-800 flex items-center justify-between">
+                      <span className="text-[10px] text-slate-400">Yazım:</span>
+                      <span className={`font-mono text-xs font-bold ${item.text}`}>
+                        ⚡ {item.speed}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* STAGE 4: Live Speed Duel across all 7 Models */}
           {stage === 'duel' && (
             <motion.div
               key="duel"
-              initial={{ opacity: 0, y: 24 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -24 }}
-              transition={{ duration: 0.7 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              transition={{ duration: 0.6 }}
               className="w-full max-w-6xl mx-auto"
             >
-              <div className="text-center mb-6">
-                <div className="text-xs font-mono uppercase tracking-widest text-amber-400 mb-1">
-                  CANLI YAZIŞMA HIZI KARŞILAŞTIRMASI
+              <div className="text-center mb-4">
+                <div className="inline-flex items-center gap-2 text-xs font-mono text-amber-300 mb-1.5">
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>SAHNE 04 · TENSOR (ORTALAMA) VS QUBİT (EN İYİ) CANLI YAZIM DÜELLOSU</span>
                 </div>
-                <h2 className="text-xl sm:text-2xl font-bold text-white">
-                  WİFO A3 QUANTUM vs Q-PU 9000 SERIES
+                <h2 className="text-lg sm:text-2xl font-bold text-white">
+                  Tensor: A1 (20sn) · A1+ (16sn) · A2- (15sn) | QUBİT: A2 (10sn) · A2+ (8sn) · A3 (5sn) · Q-PU 9000 (1sn)
                 </h2>
-                <p className="text-xs text-slate-400 mt-1 max-w-2xl mx-auto">
-                  {PROMPT_TEXT}
-                </p>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Left Card: WİFO A3 QUANTUM */}
-                <div className="rounded-3xl bg-slate-900/90 border border-purple-500/30 p-6 flex flex-col h-[360px] shadow-xl">
-                  <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300">
-                        <Cpu className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <div className="text-sm font-bold text-white">WİFO A3 QUANTUM</div>
-                        <div className="text-[11px] text-purple-300 font-mono">64-Qubit • Standart Kuantum Hızı</div>
+              {/* 3 Tensor Technology (Ortalama) Reference Speed Bars: A1 (20s), A1+ (16s), A2- (15s) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                <div className="px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-blue-500/30">
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="font-bold text-blue-300">
+                      WİFO A1 · Tensor (Ortalama)
+                    </span>
+                    <span className="font-mono text-blue-200 tabular-nums">
+                      {a1Elapsed.toFixed(1)}s / 20.0s
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-blue-500 transition-all duration-75"
+                      style={{ width: `${Math.min(100, (a1Elapsed / 20.0) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-indigo-500/30">
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="font-bold text-indigo-300">
+                      WİFO A1+ · Tensor (Ortalama)
+                    </span>
+                    <span className="font-mono text-indigo-200 tabular-nums">
+                      {a1PlusElapsed.toFixed(1)}s / 16.0s
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-indigo-400 transition-all duration-75"
+                      style={{ width: `${Math.min(100, (a1PlusElapsed / 16.0) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-sky-400/40">
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="font-bold text-sky-300">
+                      WİFO A2- (Yeni) · Tensor (Ortalama)
+                    </span>
+                    <span className="font-mono text-sky-200 tabular-nums">
+                      {a2MinusElapsed.toFixed(1)}s / 15.0s
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-sky-400 transition-all duration-75"
+                      style={{ width: `${Math.min(100, (a2MinusElapsed / 15.0) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 4 QUBİT Technology (En İyi) Live Stream Cards: A2 (10s), A2+ (8s), A3 Quantum (5s), Q-PU 9000 (1s) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                {/* Card 1: WİFO A2 (10 Seconds · QUBİT) */}
+                <div className="rounded-2xl bg-slate-900/90 border border-emerald-500/35 p-4 flex flex-col h-[290px]">
+                  <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-800">
+                    <div>
+                      <div className="text-xs font-bold text-white">WİFO A2 (QUBİT)</div>
+                      <div className="text-[10px] text-emerald-300 font-mono">
+                        En İyi · Hedef: 10.0sn
                       </div>
                     </div>
-                    <div className="text-right font-mono">
-                      <div className="text-xs font-bold text-purple-300 tabular-nums">42 Tok/sn</div>
-                      <div className="text-[10px] text-slate-400">
-                        {a3Typed.length < A3_RESPONSE_TEXT.length ? 'Yazıyor...' : 'Tamamlandı'}
+                    <div className="text-right font-mono tabular-nums">
+                      <div className="text-xs font-bold text-emerald-400 flex items-center justify-end gap-1">
+                        <Timer className="w-3 h-3" />
+                        <span>{a2Elapsed.toFixed(1)}s / 10.0s</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Progress bar */}
-                  <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mb-3">
+                  <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mb-2.5">
                     <div
-                      className="h-full bg-purple-500 transition-all duration-100"
-                      style={{ width: `${Math.min(100, (a3Typed.length / A3_RESPONSE_TEXT.length) * 100)}%` }}
+                      className="h-full bg-emerald-500 transition-all duration-75"
+                      style={{ width: `${Math.min(100, (a2Elapsed / 10.0) * 100)}%` }}
                     />
                   </div>
 
-                  <pre className="flex-1 overflow-y-auto font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed">
-                    {a3Typed}
-                    {a3Typed.length < A3_RESPONSE_TEXT.length && (
-                      <span className="inline-block w-2 h-4 bg-purple-400 ml-1 animate-pulse" />
-                    )}
+                  <pre className="flex-1 overflow-y-auto font-mono text-[10px] text-slate-300 whitespace-pre-wrap leading-relaxed">
+                    {a2Typed}
                   </pre>
                 </div>
 
-                {/* Right Card: Q-PU 9000 SERIES */}
-                <div className="rounded-3xl bg-gradient-to-b from-amber-950/40 via-slate-900/95 to-slate-950 border-2 border-amber-400/60 p-6 flex flex-col h-[360px] shadow-2xl shadow-amber-500/10 relative overflow-hidden">
-                  <div className="flex items-center justify-between pb-3 mb-3 border-b border-amber-500/20">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-rose-500 flex items-center justify-center text-slate-950 shadow-md">
-                        <Zap className="w-5 h-5" />
+                {/* Card 2: WİFO A2+ (8 Seconds · QUBİT) */}
+                <div className="rounded-2xl bg-slate-900/90 border border-purple-500/45 p-4 flex flex-col h-[290px]">
+                  <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-800">
+                    <div>
+                      <div className="text-xs font-bold text-purple-200">
+                        WİFO A2+ (Yeni QUBİT)
                       </div>
-                      <div>
-                        <div className="text-sm font-bold text-amber-300 flex items-center gap-1.5">
-                          <span>Q-PU 9000 SERIES</span>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-200 border border-amber-400/40">
-                            32.8x DAHA HIZLI
-                          </span>
-                        </div>
-                        <div className="text-[11px] text-amber-200/80 font-mono">4096-Qubit • 12.8 THz Hiper-Çekirdek</div>
+                      <div className="text-[10px] text-purple-300 font-mono">
+                        En İyi · Hedef: 8.0sn
                       </div>
                     </div>
-                    <div className="text-right font-mono">
-                      <div className="text-xs font-bold text-emerald-400 tabular-nums">1,480 Tok/sn</div>
-                      <div className="text-[10px] text-emerald-300 flex items-center justify-end gap-1">
-                        {qpuTyped.length >= QPU_RESPONSE_TEXT.length ? (
+                    <div className="text-right font-mono tabular-nums">
+                      <div className="text-xs font-bold text-purple-300 flex items-center justify-end gap-1">
+                        <Timer className="w-3 h-3" />
+                        <span>{a2PlusElapsed.toFixed(1)}s / 8.0s</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mb-2.5">
+                    <div
+                      className="h-full bg-purple-500 transition-all duration-75"
+                      style={{ width: `${Math.min(100, (a2PlusElapsed / 8.0) * 100)}%` }}
+                    />
+                  </div>
+
+                  <pre className="flex-1 overflow-y-auto font-mono text-[10px] text-purple-100 whitespace-pre-wrap leading-relaxed">
+                    {a2PlusTyped}
+                  </pre>
+                </div>
+
+                {/* Card 3: WİFO A3 QUANTUM (5 Seconds · QUBİT) */}
+                <div className="rounded-2xl bg-slate-900/90 border border-cyan-500/45 p-4 flex flex-col h-[290px]">
+                  <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-800">
+                    <div>
+                      <div className="text-xs font-bold text-white">WİFO A3 QUANTUM</div>
+                      <div className="text-[10px] text-cyan-300 font-mono">
+                        En İyi · Hedef: 5.0sn
+                      </div>
+                    </div>
+                    <div className="text-right font-mono tabular-nums">
+                      <div className="text-xs font-bold text-cyan-300 flex items-center justify-end gap-1">
+                        <Timer className="w-3 h-3" />
+                        <span>{a3Elapsed.toFixed(1)}s / 5.0s</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mb-2.5">
+                    <div
+                      className="h-full bg-cyan-400 transition-all duration-75"
+                      style={{ width: `${Math.min(100, (a3Elapsed / 5.0) * 100)}%` }}
+                    />
+                  </div>
+
+                  <pre className="flex-1 overflow-y-auto font-mono text-[10px] text-slate-200 whitespace-pre-wrap leading-relaxed">
+                    {a3Typed}
+                  </pre>
+                </div>
+
+                {/* Card 4: Q-PU 9000 SERIES (1 Second · QUBİT Zirve) */}
+                <div className="rounded-2xl bg-gradient-to-b from-amber-950/40 via-slate-900/95 to-slate-950 border-2 border-amber-400/70 p-4 flex flex-col h-[290px] shadow-xl">
+                  <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-amber-500/20">
+                    <div>
+                      <div className="text-xs font-bold text-amber-300">Q-PU 9000 SERIES</div>
+                      <div className="text-[10px] text-amber-200/80 font-mono">
+                        En İyi Zirve · 1.0sn
+                      </div>
+                    </div>
+                    <div className="text-right font-mono tabular-nums">
+                      <div className="text-xs font-bold text-amber-300 flex items-center justify-end gap-1">
+                        <Timer className="w-3 h-3" />
+                        <span>{qpuElapsed.toFixed(1)}s / 1.0s</span>
+                      </div>
+                      <div className="text-[9px] text-emerald-400 flex items-center justify-end gap-1">
+                        {qpuElapsed >= 1.0 ? (
                           <>
-                            <CheckCircle2 className="w-3 h-3" />
-                            <span>0.8 Saniyede Bitti!</span>
+                            <CheckCircle2 className="w-2.5 h-2.5" />
+                            <span>1sn Bitti!</span>
                           </>
                         ) : (
-                          <span>Hiper-Yazım...</span>
+                          <span>Yazıyor...</span>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Progress bar */}
-                  <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mb-3">
+                  <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mb-2.5">
                     <div
                       className="h-full bg-gradient-to-r from-amber-400 via-orange-500 to-emerald-400 transition-all duration-75"
-                      style={{ width: `${Math.min(100, (qpuTyped.length / QPU_RESPONSE_TEXT.length) * 100)}%` }}
+                      style={{ width: `${Math.min(100, (qpuElapsed / 1.0) * 100)}%` }}
                     />
                   </div>
 
-                  <pre className="flex-1 overflow-y-auto font-mono text-xs text-amber-100 whitespace-pre-wrap leading-relaxed">
+                  <pre className="flex-1 overflow-y-auto font-mono text-[10px] text-amber-100 whitespace-pre-wrap leading-relaxed">
                     {qpuTyped}
                   </pre>
                 </div>
@@ -517,58 +826,93 @@ export const QPU9000Showcase: React.FC<QPU9000ShowcaseProps> = ({
             </motion.div>
           )}
 
-          {/* STAGE 3: Finale ("FUNZONE QUANTUM SERİES") */}
+          {/* STAGE 5: Grand Finale */}
           {stage === 'finale' && (
             <motion.div
               key="finale"
               initial={{ opacity: 0, scale: 0.85 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 1, ease: 'easeOut' }}
+              transition={{ duration: 0.9, ease: 'easeOut' }}
               className="text-center px-4"
             >
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-mono uppercase tracking-[0.25em] mb-6">
+              <div className="inline-flex items-center gap-2 text-amber-300 text-xs font-mono mb-6">
                 <Crown className="w-4 h-4" />
-                KURUCU ÖZEL LANSMANI TAMAMLANDI
+                <span>SAHNE 05 · ORİJİNAL TANITIM FİNALİ (TÜM KULLANICILARA AÇIK)</span>
               </div>
 
-              <h1 className="text-4xl sm:text-6xl md:text-7xl font-black tracking-wider uppercase bg-gradient-to-r from-amber-300 via-white to-rose-400 bg-clip-text text-transparent mb-6 drop-shadow-[0_0_35px_rgba(251,191,36,0.35)]">
+              <h1 className="text-4xl sm:text-6xl md:text-7xl font-black tracking-wider bg-gradient-to-r from-amber-300 via-white to-rose-400 bg-clip-text text-transparent mb-6">
                 FUNZONE QUANTUM SERİES
               </h1>
 
-              <p className="text-sm sm:text-base text-slate-300 max-w-xl mx-auto mb-8">
-                Q-PU 9000 Series işlemcisi kurucu hesabınız için aktif edildi. Başlama yerine yönlendiriliyorsunuz...
-                {countdown !== null && (
-                  <span className="ml-2 font-mono font-bold text-amber-400 tabular-nums">({countdown}s)</span>
-                )}
+              <p className="text-sm sm:text-base text-slate-300 max-w-2xl mx-auto mb-8">
+                Tensor Teknolojisi (Ortalama: A1 20sn, A1+ 16sn, A2- 15sn) ve QUBİT Teknolojisi (En
+                İyi: A2 10sn, A2+ 8sn, A3 Quantum 5sn, Q-PU 9000 Series 1sn) işlemci ailesi tüm
+                kullanıcılarımızın deneyimine hazırdır.
               </p>
 
-              <button
-                onClick={() => {
-                  stopBackgroundMusic();
-                  onSelectQpuProcessor();
-                  onFinishToStartScreen();
-                }}
-                className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 to-rose-500 text-slate-950 font-bold text-sm shadow-xl shadow-amber-500/20 inline-flex items-center gap-2 hover:scale-105 transition-transform cursor-pointer"
-              >
-                <RotateCcw className="w-4 h-4" />
-                <span>Hemen Başlama Yerine Dön</span>
-              </button>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleRestartFullVideo}
+                  className="px-6 py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-sm inline-flex items-center gap-2 transition-all cursor-pointer"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  <span>Eski Videoyu Tekrar İzle</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    stopBackgroundMusic();
+                    onSelectQpuProcessor();
+                    if (onCloseModal) {
+                      onCloseModal();
+                    } else {
+                      onFinishToStartScreen();
+                    }
+                  }}
+                  className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 to-rose-500 text-slate-950 font-bold text-sm shadow-xl shadow-amber-500/20 inline-flex items-center gap-2 hover:scale-105 transition-transform cursor-pointer"
+                >
+                  <Zap className="w-4 h-4" />
+                  <span>{onCloseModal ? 'Sohbet Ekranına Dön' : 'Başlama Yerine Dön'}</span>
+                </button>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      {/* Bottom Timeline Indicator */}
-      <div className="relative z-20 px-6 py-4 border-t border-white/10 flex items-center justify-between text-xs text-slate-400">
-        <div className="flex items-center gap-2 sm:gap-4">
-          <span className={stage === 'white_entry' ? 'text-amber-400 font-bold' : ''}>1. Beyazdan Siyaha Geçiş</span>
-          <span>→</span>
-          <span className={stage === 'quote' ? 'text-amber-400 font-bold' : ''}>2. Q-PU Manifestosu</span>
-          <span>→</span>
-          <span className={stage === 'duel' ? 'text-amber-400 font-bold' : ''}>3. A3 vs Q-PU 9000 Yazış Hızı</span>
-          <span>→</span>
-          <span className={stage === 'finale' ? 'text-amber-400 font-bold' : ''}>4. FUNZONE QUANTUM SERİES</span>
+      {/* Bottom Interactive Scene Scrubber — Anyone can click any scene */}
+      <div className="relative z-20 px-6 py-4 border-t border-white/10 bg-slate-950/70 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
+        <div className="flex flex-wrap items-center gap-2">
+          {[
+            { id: 'white_entry' as VideoStage, label: '1. Beyazdan Siyaha Giriş' },
+            { id: 'quote' as VideoStage, label: '2. Tensor vs QUBİT Manifestosu' },
+            { id: 'architecture' as VideoStage, label: '3. 7 İşlemci Mimarisi' },
+            { id: 'duel' as VideoStage, label: '4. Canlı Hız Düellosu (20s-1s)' },
+            { id: 'finale' as VideoStage, label: '5. FUNZONE QUANTUM SERİES' },
+          ].map((sceneBtn) => {
+            const isCurrent = stage === sceneBtn.id;
+            return (
+              <button
+                key={sceneBtn.id}
+                type="button"
+                onClick={() => handleJumpToStage(sceneBtn.id)}
+                className={`px-3 py-1.5 rounded-xl font-medium transition-all cursor-pointer ${
+                  isCurrent
+                    ? 'bg-amber-500/20 border border-amber-400/60 text-amber-300 font-bold'
+                    : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
+                }`}
+              >
+                {sceneBtn.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="text-[11px] font-mono text-emerald-400">
+          ✓ Tüm Kullanıcılara Açık Orijinal Video
         </div>
       </div>
     </div>

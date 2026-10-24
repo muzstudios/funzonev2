@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   AlertCircle,
   X,
+  Film,
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { BrandLogo } from './BrandLogo';
@@ -20,6 +21,7 @@ interface AuthWelcomeScreenProps {
   isDarkMode: boolean;
   onCompleteAuth: (profile: UserProfile) => void;
   onQuickStartGuest: () => void;
+  onWatchPromoVideo?: () => void;
   isModal?: boolean;
   onCloseModal?: () => void;
   currentUser?: UserProfile | null;
@@ -30,6 +32,7 @@ export const AuthWelcomeScreen: React.FC<AuthWelcomeScreenProps> = ({
   isDarkMode,
   onCompleteAuth,
   onQuickStartGuest,
+  onWatchPromoVideo,
   isModal = false,
   onCloseModal,
   currentUser,
@@ -199,20 +202,33 @@ export const AuthWelcomeScreen: React.FC<AuthWelcomeScreenProps> = ({
           </div>
         </div>
 
-        {/* Immediate "Hemen Başla" Action Bar */}
+        {/* Immediate "Hemen Başla" & "Eski Videoyu İzle" Action Bar */}
         <div className="pt-6 mt-6 border-t border-slate-500/15 flex flex-wrap items-center justify-between gap-4">
           <div className="text-xs text-slate-400">
-            Hesap oluşturmadan da tek tıkla kuantum çalışma alanına geçebilirsiniz.
+            Hesap oluşturmadan da tek tıkla kuantum çalışma alanına veya tanıtım videosuna geçebilirsiniz.
           </div>
 
-          <button
-            type="button"
-            onClick={onQuickStartGuest}
-            className="flex items-center gap-2 px-6 py-3 rounded-2xl font-display font-bold text-sm text-slate-950 bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400 hover:opacity-95 transition-opacity whitespace-nowrap shrink-0 shadow-lg shadow-cyan-500/15"
-          >
-            <span>Hemen Başla</span>
-            <ArrowRight size={16} />
-          </button>
+          <div className="flex flex-wrap items-center gap-2.5">
+            {onWatchPromoVideo && (
+              <button
+                type="button"
+                onClick={onWatchPromoVideo}
+                className="flex items-center gap-2 px-5 py-3 rounded-2xl font-display font-bold text-xs sm:text-sm text-slate-950 bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 hover:opacity-95 transition-opacity whitespace-nowrap shrink-0 shadow-lg shadow-amber-500/15 cursor-pointer"
+              >
+                <Film size={16} />
+                <span>Eski Videoyu İzle (Herkese Açık)</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={onQuickStartGuest}
+              className="flex items-center gap-2 px-6 py-3 rounded-2xl font-display font-bold text-sm text-slate-950 bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400 hover:opacity-95 transition-opacity whitespace-nowrap shrink-0 shadow-lg shadow-cyan-500/15 cursor-pointer"
+            >
+              <span>Hemen Başla</span>
+              <ArrowRight size={16} />
+            </button>
+          </div>
         </div>
       </div>
 
