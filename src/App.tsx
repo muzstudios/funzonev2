@@ -1,3004 +1,2168 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { GoogleGenAI, Modality } from "@google/genai";
-import { 
-  Send, Bot, User, Sparkles, Trash2, Github, Loader2, Copy, Check, 
-  Volume2, Image as ImageIcon, MessageSquare, 
-  Languages, Globe, Play, Download, Zap, Heart, Shield, Rocket,
-  Moon, Sun, Info, Brain, Calendar, HelpCircle, Cpu, Lock, LogOut, Palette, FileUp, ExternalLink, AlertCircle, Building2, Camera, Eye, EyeOff
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  Send,
+  User,
+  Trash2,
+  Copy,
+  Check,
+  Volume2,
+  VolumeX,
+  Mic,
+  MicOff,
+  Gift,
+  Moon,
+  Sun,
+  RefreshCw,
+  Bell,
+  Download,
+  Square,
+  Sliders,
+  AudioWaveform,
+  LogIn,
+  Crown,
+  Compass,
+  ThumbsUp,
+  ThumbsDown,
+  RotateCcw,
+  Zap,
+  Dna,
 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn } from './lib/utils';
-import { Logo } from './components/Logo';
+import {
+  AILevel,
+  AppMode,
+  AppNotification,
+  Message,
+  NotificationCategory,
+  NotificationPreferences,
+  NotificationSeverity,
+  UserProfile,
+  VoiceSettings,
+} from './types';
+import { BrandLogo } from './components/BrandLogo';
+import { QuantumProcessorHUD } from './components/QuantumProcessorHUD';
+import { GiftCodeModal } from './components/GiftCodeModal';
+import { ModelSelector } from './components/ModelSelector';
+import { QuantumImageStudio } from './components/QuantumImageStudio';
+import {
+  NotificationSettingsModal,
+  NotificationToastContainer,
+  playQuantumNotificationSound,
+} from './components/NotificationSettingsModal';
+import {
+  VoiceChangerModal,
+  VOICE_PROFILES,
+  playQuantumVoiceResonance,
+} from './components/VoiceChangerModal';
+import { AuthWelcomeScreen } from './components/AuthWelcomeScreen';
+import { SmartTopicsBar, SmartTopicItem } from './components/SmartTopicsBar';
+import { ASeriesComparisonView } from './components/ASeriesComparisonView';
+import { QPU9000Showcase } from './components/QPU9000Showcase';
+import { QuantumEnergyFlowBar } from './components/QuantumEnergyFlowBar';
+import { QuantumAnalyticsPanel } from './components/QuantumAnalyticsPanel';
+import { BioscienceWorkbench } from './components/BioscienceWorkbench';
 
-// Initialize Gemini API
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
-
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: number;
-  type?: 'text' | 'image';
-  mediaUrl?: string;
-  botName?: string;
-}
-
-interface ChatSession {
-  id: string;
-  title: string;
-  messages: Message[];
-  timestamp: number;
-}
-
-type Mode = 'chat' | 'image' | 'upload';
-type AILevel = 'A1' | 'A1+' | 'A1,5' | 'A1,5+' | 'A2';
-type Language = 'tr' | 'en' | 'de' | 'fr' | 'es' | 'ja' | 'pt';
-
-const LANGUAGES: Record<Language, { name: string, flag: string }> = {
-  tr: { name: 'Türkçe', flag: '🇹🇷' },
-  en: { name: 'English', flag: '🇺🇸' },
-  de: { name: 'Deutsch', flag: '🇩🇪' },
-  fr: { name: 'Français', flag: '🇫🇷' },
-  es: { name: 'Español', flag: '🇪🇸' },
-  ja: { name: '日本語', flag: '🇯🇵' },
-  pt: { name: 'Português', flag: '🇵🇹' }
+const DEFAULT_NOTIFICATION_PREFS: NotificationPreferences = {
+  enabled: true,
+  soundEnabled: true,
+  browserPushEnabled: false,
+  giftCodeEvents: true,
+  chatHistoryEvents: true,
+  modelSwitchEvents: true,
+  securityAndQuotaEvents: true,
 };
 
-// Move LandingScreen outside App to avoid recreation on every render
-const LandingScreen = ({ 
-  isDarkMode, 
-  setIsDarkMode, 
-  a1Theme, 
-  aiLevel, 
-  setShowLanding,
-  getA1ThemeClass
-}: {
-  isDarkMode: boolean;
-  setIsDarkMode: (v: boolean) => void;
-  a1Theme: string;
-  aiLevel: string;
-  setShowLanding: (v: boolean) => void;
-  getA1ThemeClass: () => string;
-}) => (
-  <div className={cn(
-    "fixed inset-0 z-50 flex flex-col items-center justify-center transition-colors duration-700",
-    isDarkMode ? "bg-black" : "bg-indigo-950"
-  )}>
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/20 rounded-full blur-[120px]" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/20 rounded-full blur-[120px]" />
-    </div>
+const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
+  profileId: 'natural_assistant',
+  pitch: 1.06,
+  rate: 1.04,
+  volume: 1.0,
+  selectedVoiceURI: '',
+  quantumResonance: false,
+  autoSpeak: true,
+};
 
-    <motion.div 
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.8 }}
-      className="relative z-10 text-center space-y-8 px-6"
-    >
-      <div className="relative inline-block">
-        <motion.div
-          animate={{ 
-            y: [0, -20, 0],
-            rotate: [0, 8, -8, 0],
-            scale: [1, 1.05, 1]
-          }}
-          transition={{ 
-            duration: 5, 
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-          className={cn(
-            "w-32 h-32 rounded-[2.5rem] flex items-center justify-center shadow-[0_0_50px_rgba(79,70,229,0.4)] mx-auto transition-all duration-500 overflow-hidden",
-            getA1ThemeClass()
-          )}
-        >
-          {localStorage.getItem('funzone_custom_icon') ? (
-            <img src={localStorage.getItem('funzone_custom_icon')!} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-          ) : (
-            <Logo className="w-20 h-20" />
-          )}
-        </motion.div>
-        <motion.div 
-          animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] }}
-          transition={{ duration: 2, repeat: Infinity }}
-          className="absolute -inset-4 bg-indigo-500/20 rounded-[3rem] blur-xl -z-10"
-        />
-      </div>
-
-      <div className="space-y-4">
-        <h1 className="text-7xl font-black text-white tracking-tighter italic flex items-center justify-center gap-4">
-          FUN<span className={cn("transition-colors duration-500", a1Theme === 'indigo' ? 'text-indigo-400' : a1Theme === 'emerald' ? 'text-emerald-400' : a1Theme === 'rose' ? 'text-rose-400' : 'text-amber-400')}>ZONE</span>
-        </h1>
-        <p className="text-indigo-200/80 text-xl font-medium tracking-wide">
-          Powered by <span className="text-white font-bold">WİFO {aiLevel}</span>
-        </p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
-        {[
-          { icon: MessageSquare, label: 'Sınırsız Sohbet', color: 'bg-blue-500/10 text-blue-400' },
-          { icon: ImageIcon, label: 'Yapay Zeka Çizim', color: 'bg-purple-500/10 text-purple-400' },
-          { icon: Sparkles, label: 'WİFO A2 Yakında', color: 'bg-yellow-500/10 text-yellow-400' },
-          { icon: Shield, label: 'Güvenli Deneyim', color: 'bg-emerald-500/10 text-emerald-400' },
-        ].map((feature, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 + (i * 0.1) }}
-            className={cn("flex items-center gap-3 p-4 rounded-2xl border border-white/5", feature.color)}
-          >
-            <feature.icon size={20} />
-            <span className="text-sm font-bold">{feature.label}</span>
-          </motion.div>
-        ))}
-      </div>
-
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={() => setShowLanding(false)}
-        className={cn(
-          "group relative px-12 py-5 bg-white rounded-2xl font-black text-xl shadow-[0_20px_40px_rgba(255,255,255,0.1)] transition-all hover:shadow-[0_20px_60px_rgba(255,255,255,0.2)]",
-          a1Theme === 'indigo' ? 'text-indigo-950' : a1Theme === 'emerald' ? 'text-emerald-950' : a1Theme === 'rose' ? 'text-rose-950' : 'text-amber-950'
-        )}
-      >
-        <span className="relative z-10 flex items-center gap-3">
-          BAŞLAYALIM <Play size={24} fill="currentColor" />
-        </span>
-      </motion.button>
-
-      <div className="pt-8 flex items-center justify-center gap-6 text-white/40">
-        <button onClick={() => setIsDarkMode(false)} className={cn("flex items-center gap-2 text-xs font-bold transition-colors", !isDarkMode ? "text-white" : "hover:text-white")}>
-          <Sun size={16} /> AYDINLIK
-        </button>
-        <div className="w-px h-4 bg-white/10" />
-        <button onClick={() => setIsDarkMode(true)} className={cn("flex items-center gap-2 text-xs font-bold transition-colors", isDarkMode ? "text-white" : "hover:text-white")}>
-          <Moon size={16} /> KARANLIK
-        </button>
-      </div>
-    </motion.div>
-  </div>
-);
-
-export default function App() {
-  const [showLanding, setShowLanding] = useState(true);
-  const [mode, setMode] = useState<Mode>('chat');
-  const [showHistory, setShowHistory] = useState(false);
-  const [hasApiKey, setHasApiKey] = useState(false);
-  const [showA2Modal, setShowA2Modal] = useState(false);
-  const [showUpdateNotes, setShowUpdateNotes] = useState(false);
-  const [showHelpGuide, setShowHelpGuide] = useState(true);
-  const [showPlusConfirmation, setShowPlusConfirmation] = useState(false);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [loginError, setLoginError] = useState(false);
-  const [isTransferring, setIsTransferring] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(() => {
-    return localStorage.getItem('funzone_onboarding_seen') !== 'true';
-  });
-  const [onboardingStep, setOnboardingStep] = useState(0);
-  const [isPlusActive, setIsPlusActive] = useState(() => {
-    const saved = localStorage.getItem('funzone_plus_active');
-    return saved === 'true';
-  });
-  const [language, setLanguage] = useState<Language>(() => {
-    const saved = localStorage.getItem('funzone_language');
-    return (saved as Language) || 'tr';
-  });
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    const saved = localStorage.getItem('funzone_dark_mode');
-    return saved === 'true';
-  });
-  
-  const [sessions, setSessions] = useState<ChatSession[]>(() => {
-    const saved = localStorage.getItem('funzone_sessions');
-    return saved ? JSON.parse(saved) : [];
-  });
-  
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(() => {
-    const saved = localStorage.getItem('funzone_current_session_id');
-    return saved || null;
-  });
-
-  const [messages, setMessages] = useState<Message[]>([]);
-  
-  // Auth States
-  const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    return localStorage.getItem('funzone_logged_in') === 'true';
-  });
-  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
-  const [userEmail, setUserEmail] = useState('');
-  const [userPassword, setUserPassword] = useState('');
-  const [profanityCount, setProfanityCount] = useState(0);
-
-  const getAiInstance = () => {
-    const apiKey = process.env.GEMINI_API_KEY || '';
-    return new GoogleGenAI({ apiKey });
-  };
-
-  const [aiLevel, setAiLevel] = useState<AILevel>(() => {
-    const saved = localStorage.getItem('funzone_ai_level');
-    return (saved as AILevel) || 'A1';
-  });
-
-  // Turkey's New Rules States
-  const [isMuted, setIsMuted] = useState(false);
-  const [muteTimer, setMuteTimer] = useState(0);
-  const [isParentalControlActive, setIsParentalControlActive] = useState(() => {
-    return localStorage.getItem('funzone_parental_control') === 'true';
-  });
-  const [userAge, setUserAge] = useState<number | null>(() => {
-    const saved = localStorage.getItem('funzone_user_age');
-    return saved ? parseInt(saved) : null;
-  });
-  const [showFaceScan, setShowFaceScan] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [profanityWarning, setProfanityWarning] = useState(false);
-  const [showParentalSettings, setShowParentalSettings] = useState(false);
-  const [parentalOptions, setParentalOptions] = useState(() => {
-    const saved = localStorage.getItem('funzone_parental_options');
-    return saved ? JSON.parse(saved) : {
-      strictFilter: true,
-      educationalMode: true,
-      simpleLanguage: true,
-      timeLimit: false
+interface SpeechRecognitionEventLike {
+  resultIndex: number;
+  results: {
+    length: number;
+    [index: number]: {
+      isFinal: boolean;
+      [subIndex: number]: {
+        transcript: string;
+      };
     };
+  };
+}
+
+interface SpeechRecognitionLike {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onstart: (() => void) | null;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+}
+
+function formatTextForSpeech(markdownText: string): string {
+  return markdownText
+    .replace(/```[\s\S]*?```/g, ' Kod bloğu eklendi. ')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/!\[.*?\]\(.*?\)/g, '')
+    .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
+    .replace(/[*#_~>|]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function App() {
+  // Theme state
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    return localStorage.getItem('funzone_theme') !== 'light';
   });
 
-  const [showLogoPreview, setShowLogoPreview] = useState(false);
-
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        streamRef.current = stream;
+  // User Authentication & "Başla Yeri" Onboarding state
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
+    const saved = localStorage.getItem('funzone_user_profile');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return null;
       }
-    } catch (err) {
-      console.error("Kamera erişim hatası:", err);
     }
-  };
+    return null;
+  });
 
-  const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
+  // Whether the user is viewing the full-screen "Başla Yeri" welcome/login hub
+  const [showStartScreen, setShowStartScreen] = useState<boolean>(() => {
+    return !localStorage.getItem('funzone_has_started');
+  });
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  // App navigation mode
+  const [mode, setMode] = useState<AppMode>('chat');
+
+  // Gift & Unlock states
+  const [isA3Unlocked, setIsA3Unlocked] = useState<boolean>(() => {
+    return localStorage.getItem('funzone_a3_quantum_unlocked') === 'true';
+  });
+  const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
+  const [giftRemaining, setGiftRemaining] = useState<number>(10);
+
+  // Notification Settings & Log states
+  const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
+  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>(() => {
+    const saved = localStorage.getItem('funzone_notification_prefs');
+    if (saved) {
+      try {
+        return { ...DEFAULT_NOTIFICATION_PREFS, ...JSON.parse(saved) };
+      } catch {
+        return DEFAULT_NOTIFICATION_PREFS;
+      }
     }
-  };
+    return DEFAULT_NOTIFICATION_PREFS;
+  });
 
+  const [notifications, setNotifications] = useState<AppNotification[]>(() => {
+    const saved = localStorage.getItem('funzone_notification_log');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return [];
+      }
+    }
+    return [
+      {
+        id: 'init-notif',
+        title: 'Kuantum Bildirim & Ses Değiştirici Hazır',
+        message: '6 farklı ses karakteri, Sesli Giriş, Giriş Sistemi ve 10 kişilik hediye kodu aktif.',
+        category: 'system',
+        severity: 'info',
+        timestamp: Date.now(),
+        read: false,
+      },
+    ];
+  });
+
+  const [toasts, setToasts] = useState<AppNotification[]>([]);
+
+  // AI Level state
+  const [aiLevel, setAiLevel] = useState<AILevel>(() => {
+    return localStorage.getItem('funzone_a3_quantum_unlocked') === 'true' ? 'A3_QUANTUM' : 'A1+';
+  });
+
+  // Voice Changer & SpeechSynthesis states
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
+  const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(() => {
+    const saved = localStorage.getItem('funzone_voice_settings');
+    if (saved) {
+      try {
+        return { ...DEFAULT_VOICE_SETTINGS, ...JSON.parse(saved) };
+      } catch {
+        return DEFAULT_VOICE_SETTINGS;
+      }
+    }
+    return DEFAULT_VOICE_SETTINGS;
+  });
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [speakingId, setSpeakingId] = useState<string | null>(null);
+
+  // Voice Input (Microphone SpeechRecognition) states
+  const [isListening, setIsListening] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState('');
+  const [autoSendVoice, setAutoSendVoice] = useState<boolean>(() => {
+    return localStorage.getItem('funzone_auto_send_voice') !== 'false';
+  });
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const latestVoiceTextRef = useRef<string>('');
+
+  // Chat states
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const saved = localStorage.getItem('funzone_chat_history');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse history', e);
+      }
+    }
+    return [
+      {
+        id: 'welcome-msg',
+        role: 'assistant',
+        content: `Merhaba, ben **WİFO A3 QUANTUM**. WİFO Şirketi tarafından (**Kurucu: FE OWNER BATUHAN**) geliştirilen yeni nesil **Q-PU 9000 Kuantum Nöral İşlemci** mimarisiyle çalışıyorum.\n\n- **10 Kişilik Hediye Kodu (\`QUANTUM-10\`):** WİFO A3 QUANTUM'u tam kapasite açar ve **WİFO A2** modelini ücretsiz hediye olarak hesabınıza tanımlar.\n- **Ses Değiştirme Stüdyosu & Sesli Giriş:** Üst araç çubuğundaki **Ses Değiştirici** ile 6 farklı ses karakterinden (Elif, Barbaros, Q-PU 9000 Sibernetik, Nova, Bilge) dilediğinizi seçebilir, **Sesli Giriş** ile mikrofondan soru sorabilirsiniz.`,
+        timestamp: Date.now(),
+        botName: 'WİFO A3 QUANTUM',
+        modelTag: 'Q-PU 9000',
+      },
+    ];
+  });
+
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [showProcessorPanel, setShowProcessorPanel] = useState(false);
+  const [showEnergyFlowBar, setShowEnergyFlowBar] = useState<boolean>(() => {
+    return localStorage.getItem('funzone_energy_bar_enabled') !== 'false';
+  });
+  const [activeSessionTitle, setActiveSessionTitle] = useState<string>(() => {
+    return localStorage.getItem('funzone_session_title') || 'Kuantum Genel Oturumu';
+  });
+  const [draggedTopic, setDraggedTopic] = useState<SmartTopicItem | null>(null);
+  const [isDragOverChat, setIsDragOverChat] = useState(false);
+  const [isDragOverInput, setIsDragOverInput] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Sync theme
   useEffect(() => {
-    if (showFaceScan) {
-      startCamera();
+    localStorage.setItem('funzone_theme', isDarkMode ? 'dark' : 'light');
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
     } else {
-      stopCamera();
+      document.documentElement.classList.remove('dark');
     }
-  }, [showFaceScan]);
+  }, [isDarkMode]);
+
+  // Save preferences
+  useEffect(() => {
+    localStorage.setItem('funzone_notification_prefs', JSON.stringify(notificationPrefs));
+  }, [notificationPrefs]);
 
   useEffect(() => {
-    localStorage.setItem('funzone_parental_options', JSON.stringify(parentalOptions));
-  }, [parentalOptions]);
-
-  const PROFANITY_LIST = [
-    'küfür1', 'küfür2', 'argo1', 'argo2', // Placeholder for real list
-    'aptal', 'salak', 'gerizekalı' // Some common ones for demo
-  ];
+    localStorage.setItem('funzone_notification_log', JSON.stringify(notifications.slice(0, 50)));
+  }, [notifications]);
 
   useEffect(() => {
-    let interval: any;
-    if (muteTimer > 0) {
-      interval = setInterval(() => {
-        setMuteTimer(prev => prev - 1);
-      }, 1000);
-    } else if (muteTimer === 0 && isMuted) {
-      setIsMuted(false);
+    localStorage.setItem('funzone_voice_settings', JSON.stringify(voiceSettings));
+  }, [voiceSettings]);
+
+  useEffect(() => {
+    localStorage.setItem('funzone_session_title', activeSessionTitle);
+  }, [activeSessionTitle]);
+
+  useEffect(() => {
+    localStorage.setItem('funzone_auto_send_voice', String(autoSendVoice));
+  }, [autoSendVoice]);
+
+  useEffect(() => {
+    localStorage.setItem('funzone_energy_bar_enabled', String(showEnergyFlowBar));
+  }, [showEnergyFlowBar]);
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('funzone_user_profile', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('funzone_user_profile');
     }
-    return () => clearInterval(interval);
-  }, [muteTimer, isMuted]);
+  }, [currentUser]);
 
+  // Load SpeechSynthesis voices
   useEffect(() => {
-    localStorage.setItem('funzone_parental_control', isParentalControlActive.toString());
-  }, [isParentalControlActive]);
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
 
-  useEffect(() => {
-    if (userAge) localStorage.setItem('funzone_user_age', userAge.toString());
-  }, [userAge]);
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) {
+        setAvailableVoices(voices);
+      }
+    };
 
-  useEffect(() => {
-    localStorage.setItem('funzone_logged_in', isLoggedIn.toString());
-  }, [isLoggedIn]);
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.onvoiceschanged = null;
+      }
+    };
+  }, []);
 
-  const handleAuth = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (userEmail && userPassword) {
-      setIsLoggedIn(true);
-      setProfanityCount(0); // Reset on new login
+  // Central Notification Dispatcher
+  const triggerNotification = useCallback(
+    (
+      title: string,
+      message: string,
+      category: NotificationCategory,
+      severity: NotificationSeverity = 'info',
+      forceDeliver = false
+    ) => {
+      const newItem: AppNotification = {
+        id: 'notif-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+        title,
+        message,
+        category,
+        severity,
+        timestamp: Date.now(),
+        read: false,
+      };
+
+      setNotifications((prev) => [newItem, ...prev.slice(0, 49)]);
+
+      if (!forceDeliver) {
+        if (!notificationPrefs.enabled) return;
+        if (category === 'gift_code' && !notificationPrefs.giftCodeEvents) return;
+        if (category === 'chat_history' && !notificationPrefs.chatHistoryEvents) return;
+        if (category === 'model_switch' && !notificationPrefs.modelSwitchEvents) return;
+        if (category === 'system' && !notificationPrefs.securityAndQuotaEvents) return;
+      }
+
+      setToasts((prev) => [newItem, ...prev.slice(0, 3)]);
+      setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== newItem.id));
+      }, 5000);
+
+      if (notificationPrefs.soundEnabled) {
+        playQuantumNotificationSound(severity);
+      }
+
+      if (
+        notificationPrefs.browserPushEnabled &&
+        typeof window !== 'undefined' &&
+        'Notification' in window &&
+        Notification.permission === 'granted'
+      ) {
+        try {
+          new Notification(title, { body: message });
+        } catch {
+          // Ignore restricted context errors
+        }
+      }
+    },
+    [notificationPrefs]
+  );
+
+  // Enhanced SpeechSynthesis Reader with Voice Changer support
+  const speakText = useCallback(
+    (id: string, rawText: string, forceSpeak = false, customVoiceOverride?: VoiceSettings) => {
+      if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+
+      const activeSettings = customVoiceOverride || voiceSettings;
+
+      if (!forceSpeak && speakingId === id) {
+        window.speechSynthesis.cancel();
+        setSpeakingId(null);
+        return;
+      }
+
+      window.speechSynthesis.cancel();
+      const cleaned = formatTextForSpeech(rawText);
+      if (!cleaned) return;
+
+      // Play subtle harmonic vocoder effect if Quantum Resonance is enabled
+      if (activeSettings.quantumResonance) {
+        playQuantumVoiceResonance();
+      }
+
+      // Select appropriate voice
+      const turkishVoices = availableVoices.filter(
+        (v) =>
+          v.lang.toLowerCase().startsWith('tr') ||
+          v.name.toLowerCase().includes('turkish') ||
+          v.name.toLowerCase().includes('türkçe')
+      );
+
+      let chosenVoice: SpeechSynthesisVoice | null = null;
+      if (activeSettings.selectedVoiceURI) {
+        chosenVoice =
+          availableVoices.find((v) => v.voiceURI === activeSettings.selectedVoiceURI) || null;
+      }
+
+      if (!chosenVoice && turkishVoices.length > 0) {
+        chosenVoice =
+          turkishVoices.find(
+            (v) => v.name.toLowerCase().includes('natural') || v.name.toLowerCase().includes('google')
+          ) || turkishVoices[0];
+      }
+
+      const sentences = cleaned.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [cleaned];
+      setSpeakingId(id);
+
+      sentences.forEach((sentence, idx) => {
+        const trimmed = sentence.trim();
+        if (!trimmed) return;
+        const utterance = new SpeechSynthesisUtterance(trimmed);
+        utterance.lang = 'tr-TR';
+        utterance.pitch = activeSettings.pitch;
+        utterance.rate = activeSettings.rate;
+        utterance.volume = activeSettings.volume;
+        if (chosenVoice) {
+          utterance.voice = chosenVoice;
+        }
+        if (idx === sentences.length - 1) {
+          utterance.onend = () => setSpeakingId(null);
+          utterance.onerror = () => setSpeakingId(null);
+        }
+        window.speechSynthesis.speak(utterance);
+      });
+    },
+    [availableVoices, speakingId, voiceSettings]
+  );
+
+  const stopSpeaking = () => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      setSpeakingId(null);
     }
+  };
+
+  // Save chat history
+  useEffect(() => {
+    localStorage.setItem('funzone_chat_history', JSON.stringify(messages));
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Fetch gift code status
+  useEffect(() => {
+    fetch('/api/gift-code/status')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.remainingUses !== undefined) {
+          setGiftRemaining(data.remainingUses);
+        }
+      })
+      .catch((err) => console.log('Gift code status check:', err));
+  }, []);
+
+  const handleCompleteAuth = (profile: UserProfile) => {
+    setCurrentUser(profile);
+    localStorage.setItem('funzone_has_started', 'true');
+    setShowStartScreen(false);
+    setIsAuthModalOpen(false);
+
+    triggerNotification(
+      `Hoş Geldiniz, ${profile.name}`,
+      `${profile.title} olarak oturum açıldı. WİFO Kuantum çalışma alanı hazır.`,
+      'system',
+      'success'
+    );
+  };
+
+  const handleQuickStartGuest = () => {
+    if (!currentUser) {
+      const guestProfile: UserProfile = {
+        id: 'guest-' + Date.now(),
+        name: 'Misafir Kullanıcı',
+        email: 'misafir@wifo.ai',
+        role: 'guest',
+        title: 'Hızlı Başlangıç',
+        joinedAt: Date.now(),
+      };
+      setCurrentUser(guestProfile);
+    }
+    localStorage.setItem('funzone_has_started', 'true');
+    setShowStartScreen(false);
+    setIsAuthModalOpen(false);
+  };
+
+  const handleInstantFounderUnlock = () => {
+    const founderProfile: UserProfile = {
+      id: 'founder-batuhan',
+      name: 'FE OWNER BATUHAN',
+      email: 'batuhan@wifo.quantum',
+      role: 'founder',
+      title: 'WİFO Şirketi Kurucusu & Baş Mimar',
+      joinedAt: Date.now(),
+    };
+    setCurrentUser(founderProfile);
+    setIsA3Unlocked(true);
+    localStorage.setItem('funzone_a3_quantum_unlocked', 'true');
+    setAiLevel('Q_PU_9000');
+    triggerNotification(
+      'Kurucu Kimliği Doğrulandı',
+      'FE OWNER BATUHAN olarak giriş yapıldı. Q-PU 9000 Series işlemcisi ve inceleme alanı açıldı.',
+      'system',
+      'success'
+    );
   };
 
   const handleLogout = () => {
-    setIsLoggedIn(false);
-    localStorage.removeItem('funzone_logged_in');
-    setShowProfileModal(false);
-  };
-  
-  const ONBOARDING_STEPS = [
-    {
-      title: "WİFO AI'ya Hoş Geldiniz!",
-      desc: "Türkiye'nin en gelişmiş yapay zeka deneyimine ilk adımınızı attınız. Hadi size etrafı gezdirelim.",
-      icon: Rocket,
-      color: "bg-indigo-600"
-    },
-    {
-      title: "Akıllı Sohbet",
-      desc: "Sohbet modunda WİFO'nun farklı modülleri (A1, A1+, A1,5, A1,5+, A2) ile her konuda konuşabilir ve yardım alabilirsiniz.",
-      icon: MessageSquare,
-      color: "bg-emerald-500"
-    },
-    {
-      title: "Görsel Üretimi",
-      desc: "Hayalinizdeki sahneleri betimleyin, Z1 motorumuz saniyeler içinde gerçeğe dönüştürsün.",
-      icon: ImageIcon,
-      color: "bg-purple-500"
-    },
-    {
-      title: "WİFO Modülleri",
-      desc: "A1+ artık herkes için ücretsiz! Daha gelişmiş A1,5 ve A2 modelleri ise kurucularımızı bekliyor.",
-      icon: Cpu,
-      color: "bg-yellow-500"
-    },
-    {
-      title: "Kişiselleştirme",
-      desc: "Profil menüsünden dil seçeneklerini, karanlık modu ve kurucu girişini yönetebilirsiniz.",
-      icon: User,
-      color: "bg-blue-500"
-    }
-  ];
-
-  const handleNextOnboarding = () => {
-    if (onboardingStep < ONBOARDING_STEPS.length - 1) {
-      setOnboardingStep(prev => prev + 1);
-    } else {
-      setShowOnboarding(false);
-      localStorage.setItem('funzone_onboarding_seen', 'true');
-    }
+    stopSpeaking();
+    setCurrentUser(null);
+    setIsAuthModalOpen(false);
+    setShowStartScreen(true);
+    triggerNotification(
+      'Oturum Kapatıldı',
+      'Hesabınızdan güvenle çıkış yapıldı.',
+      'system',
+      'info'
+    );
   };
 
-  const skipOnboarding = () => {
-    setShowOnboarding(false);
-    localStorage.setItem('funzone_onboarding_seen', 'true');
-  };
-
-  // Check for API Key
-  useEffect(() => {
-    const checkApiKey = async () => {
-      // @ts-ignore
-      if (window.aistudio?.hasSelectedApiKey) {
-        // @ts-ignore
-        const hasKey = await window.aistudio.hasSelectedApiKey();
-        setHasApiKey(hasKey);
-      } else {
-        setHasApiKey(true); // Fallback
-      }
+  const handleSuccessfulUnlock = () => {
+    setIsA3Unlocked(true);
+    setAiLevel('A3_QUANTUM');
+    setGiftRemaining((prev) => Math.max(0, prev - 1));
+    const unlockMsgText = `10 Kişilik Hediye Kodu başarıyla uygulandı. WİFO A3 QUANTUM ve hediyeniz olan WİFO A2 modeli sınırsız olarak kullanımınıza açıldı.`;
+    const unlockMsg: Message = {
+      id: 'unlock-' + Date.now(),
+      role: 'assistant',
+      content: `**10 Kişilik Hediye Kodu Başarıyla Uygulandı**\n\n- **WİFO A3 QUANTUM:** Yeni Kuantum Nöral İşlemcimiz (Q-PU 9000, 1024 Qubit) tam yetkiyle aktif edildi.\n- **WİFO A2 Hediyesi:** A3 Quantum'un hediyesi olan WİFO A2 modeli de ücretsiz olarak kullanımınıza sunuldu.`,
+      timestamp: Date.now(),
+      botName: 'WİFO A3 QUANTUM',
+      modelTag: 'Q-PU 9000',
     };
-    checkApiKey();
-  }, []);
+    setMessages((prev) => [...prev, unlockMsg]);
 
-  const handleSelectKey = async () => {
-    // @ts-ignore
-    if (window.aistudio?.openSelectKey) {
-      // @ts-ignore
-      await window.aistudio.openSelectKey();
-      setHasApiKey(true);
+    triggerNotification(
+      'Hediye Kodu Aktive Edildi',
+      '10 kişilik QUANTUM-10 kodu kullanıldı: WİFO A3 QUANTUM ve Hediye WİFO A2 hesabınıza tanımlandı.',
+      'gift_code',
+      'success'
+    );
+
+    if (voiceSettings.autoSpeak) {
+      speakText(unlockMsg.id, unlockMsgText, true);
     }
   };
 
-  // Load messages when session changes
-  useEffect(() => {
-    if (currentSessionId) {
-      const session = sessions.find(s => s.id === currentSessionId);
-      if (session) {
-        // Only update if messages are actually different to prevent loops
-        setMessages(prev => {
-          if (JSON.stringify(prev) === JSON.stringify(session.messages)) return prev;
-          return session.messages;
+  const submitPrompt = useCallback(
+    async (promptText: string) => {
+      const cleanInput = promptText.trim();
+      if (!cleanInput || loading) return;
+
+      const userMessage: Message = {
+        id: 'msg-' + Date.now(),
+        role: 'user',
+        content: cleanInput,
+        timestamp: Date.now(),
+      };
+
+      setMessages((prev) => [...prev, userMessage]);
+      setInput('');
+      setInterimTranscript('');
+      setLoading(true);
+
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: cleanInput,
+            history: messages.slice(-6).map((m) => ({ role: m.role, content: m.content })),
+            aiLevel,
+            isFounder: currentUser?.role === 'founder',
+            isGiftClaimed: isA3Unlocked,
+          }),
         });
-      }
-    } else {
-      setMessages(prev => prev.length === 0 ? prev : []);
-    }
-  }, [currentSessionId, sessions]); // Added sessions to dependencies for correctness
 
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState<string | null>(null);
-  const [isFounder, setIsFounder] = useState(() => {
-    const saved = localStorage.getItem('funzone_is_founder');
-    return saved === 'true';
-  });
-  const [a1Theme, setA1Theme] = useState(() => {
-    return localStorage.getItem('funzone_a1_theme') || 'indigo';
-  });
-  const [plusTheme, setPlusTheme] = useState(() => {
-    return localStorage.getItem('funzone_plus_theme') || 'indigo-purple';
-  });
-  const [showProfileModal, setShowProfileModal] = useState(false);
-  const [showFounderLogin, setShowFounderLogin] = useState(false);
-  const [founderPasswordInput, setFounderPasswordInput] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
+        const data = await response.json();
 
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, []);
+        if (response.ok && data.reply) {
+          const botName =
+            aiLevel === 'Q_PU_9000'
+              ? 'Q-PU 9000 SERIES (Kurucu Özel)'
+              : aiLevel === 'A3_QUANTUM'
+              ? 'WİFO A3 QUANTUM'
+              : aiLevel === 'A2'
+              ? 'WİFO A2 (Hediye)'
+              : aiLevel === 'A1+'
+              ? 'WİFO A1+'
+              : 'WİFO A1';
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
+          const assistantMessage: Message = {
+            id: 'res-' + Date.now(),
+            role: 'assistant',
+            content: data.reply,
+            timestamp: Date.now(),
+            botName,
+            modelTag: data.quantumTelemetry?.processorName || 'Q-PU 9000',
+            quantumTelemetry: data.quantumTelemetry,
+          };
 
-  // Persistence Effects: Sync messages to sessions
-  useEffect(() => {
-    if (currentSessionId && messages.length > 0) {
-      setSessions(prev => {
-        const sessionIndex = prev.findIndex(s => s.id === currentSessionId);
-        if (sessionIndex === -1) return prev;
-        
-        // Only update if messages have actually changed
-        if (JSON.stringify(prev[sessionIndex].messages) === JSON.stringify(messages)) {
-          return prev;
+          setMessages((prev) => [...prev, assistantMessage]);
+
+          if (voiceSettings.autoSpeak) {
+            speakText(assistantMessage.id, data.reply, true);
+          }
+
+          if (data.quantumTelemetry?.usedFallback) {
+            triggerNotification(
+              'Kuantum Rezerv Çekirdeği Devrede',
+              'Yanıtınız kesintisiz olarak WİFO Q-PU 9000 yerel kuantum motoruyla üretildi.',
+              'system',
+              'info'
+            );
+          }
+        } else {
+          const errorMsg: Message = {
+            id: 'err-' + Date.now(),
+            role: 'assistant',
+            content: `Uyarı: ${data.error || 'Cevap alınamadı. Lütfen tekrar deneyin.'}`,
+            timestamp: Date.now(),
+            botName: 'Sistem Uyarısı',
+          };
+          setMessages((prev) => [...prev, errorMsg]);
         }
-
-        const newSessions = [...prev];
-        newSessions[sessionIndex] = {
-          ...newSessions[sessionIndex],
-          messages,
-          timestamp: Date.now()
+      } catch (err: any) {
+        const connErrorMsg: Message = {
+          id: 'conn-err-' + Date.now(),
+          role: 'assistant',
+          content: `Sunucuya bağlanırken bir sorun oluştu: ${err.message}`,
+          timestamp: Date.now(),
+          botName: 'Bağlantı Uyarısı',
         };
-        return newSessions;
-      });
-    }
-  }, [messages, currentSessionId]);
+        setMessages((prev) => [...prev, connErrorMsg]);
+      } finally {
+        setLoading(false);
+        setTimeout(() => textareaRef.current?.focus(), 100);
+      }
+    },
+    [aiLevel, currentUser?.role, isA3Unlocked, loading, messages, speakText, triggerNotification, voiceSettings.autoSpeak]
+  );
 
-  useEffect(() => {
-    localStorage.setItem('funzone_sessions', JSON.stringify(sessions));
-  }, [sessions]);
-
-  useEffect(() => {
-    if (currentSessionId) {
-      localStorage.setItem('funzone_current_session_id', currentSessionId);
-    } else {
-      localStorage.removeItem('funzone_current_session_id');
-    }
-  }, [currentSessionId]);
-
-  useEffect(() => {
-    localStorage.setItem('funzone_dark_mode', isDarkMode.toString());
-  }, [isDarkMode]);
-
-  useEffect(() => {
-    localStorage.setItem('funzone_language', language);
-  }, [language]);
-
-  useEffect(() => {
-    localStorage.setItem('funzone_is_founder', isFounder.toString());
-  }, [isFounder]);
-
-  useEffect(() => {
-    localStorage.setItem('funzone_a1_theme', a1Theme);
-  }, [a1Theme]);
-
-  useEffect(() => {
-    localStorage.setItem('funzone_plus_theme', plusTheme);
-  }, [plusTheme]);
-
-  useEffect(() => {
-    localStorage.setItem('funzone_ai_level', aiLevel);
-  }, [aiLevel]);
-
-  const createNewChat = () => {
-    const newId = Date.now().toString();
-    const newSession: ChatSession = {
-      id: newId,
-      title: 'Yeni Sohbet',
-      messages: [],
-      timestamp: Date.now()
-    };
-    setSessions(prev => [newSession, ...prev]);
-    setCurrentSessionId(newId);
-    setMessages([]);
-    setShowHistory(false);
+  const handleSendMessage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    await submitPrompt(input);
   };
 
-  const deleteSession = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSessions(prev => prev.filter(s => s.id !== id));
-    if (currentSessionId === id) {
-      setCurrentSessionId(null);
-      setMessages([]);
-    }
-  };
-
-  const speakText = async (text: string, messageId: string) => {
-    if (isSpeaking === messageId) {
-      setIsSpeaking(null);
+  // Microphone Voice Input (SpeechRecognition) Handler
+  const toggleVoiceInput = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
       return;
     }
 
-    setIsSpeaking(messageId);
-    try {
-      const freshAi = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || process.env.API_KEY || '' });
-      const response = await freshAi.models.generateContent({
-        model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: `Dili ${LANGUAGES[language].name} olacak şekilde seslendir: ${text}` }] }],
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: 'Kore' },
-            },
-          },
-        },
-      });
+    const SpeechRecognitionCtor =
+      (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike }).SpeechRecognition ||
+      (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike }).webkitSpeechRecognition;
 
-      const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (base64Audio) {
-        const binaryString = atob(base64Audio);
-        const len = binaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-
-        // Gemini TTS returns raw PCM 16-bit mono at 24kHz
-        const pcmData = new Int16Array(bytes.buffer);
-        const float32Data = new Float32Array(pcmData.length);
-        for (let i = 0; i < pcmData.length; i++) {
-          float32Data[i] = pcmData[i] / 32768;
-        }
-
-        if (!audioContextRef.current) {
-          audioContextRef.current = new AudioContext({ sampleRate: 24000 });
-        }
-        
-        const audioBuffer = audioContextRef.current.createBuffer(1, float32Data.length, 24000);
-        audioBuffer.getChannelData(0).set(float32Data);
-        
-        const source = audioContextRef.current.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(audioContextRef.current.destination);
-        source.onended = () => setIsSpeaking(null);
-        source.start();
-      }
-    } catch (error) {
-      console.error("TTS Error:", error);
-      setIsSpeaking(null);
+    if (!SpeechRecognitionCtor) {
+      triggerNotification(
+        'Sesli Giriş Desteklenmiyor',
+        'Tarayıcınız Web Speech API mikrofon tanıma özelliğini desteklemiyor. Chrome veya Edge kullanabilirsiniz.',
+        'system',
+        'warning',
+        true
+      );
+      return;
     }
-  };
 
-  const generateImage = async (prompt: string) => {
     try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: { parts: [{ text: prompt + (isPlusActive ? " (High quality resolution, extremely detailed, professional lighting, photorealistic)" : "") }] },
-        config: {
-          imageConfig: {
-            aspectRatio: "1:1"
+      stopSpeaking();
+      const recognition = new SpeechRecognitionCtor();
+      recognition.lang = 'tr-TR';
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      latestVoiceTextRef.current = '';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setInterimTranscript('');
+      };
+
+      recognition.onresult = (event: SpeechRecognitionEventLike) => {
+        let interim = '';
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcriptPiece = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcriptPiece;
+          } else {
+            interim += transcriptPiece;
           }
         }
-      });
 
-      const parts = response.candidates?.[0]?.content?.parts;
-      if (!parts) throw new Error("Görsel oluşturulamadı.");
-
-      for (const part of parts) {
-        if (part.inlineData) {
-          return `data:image/png;base64,${part.inlineData.data}`;
+        if (finalTranscript) {
+          const combined = (input ? input + ' ' : '') + finalTranscript.trim();
+          latestVoiceTextRef.current = combined;
+          setInput(combined);
+          setInterimTranscript('');
+        } else {
+          setInterimTranscript(interim);
         }
-      }
-      
-      throw new Error("Görsel verisi bulunamadı.");
-    } catch (error) {
-      console.error("Image Generation Error:", error);
-      throw error;
+      };
+
+      recognition.onerror = (event: { error: string }) => {
+        setIsListening(false);
+        setInterimTranscript('');
+        if (event.error === 'not-allowed') {
+          triggerNotification(
+            'Mikrofon İzni Gerekli',
+            'Sesli giriş için lütfen tarayıcınızdan mikrofon erişimine izin verin.',
+            'system',
+            'warning',
+            true
+          );
+        }
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        setInterimTranscript('');
+        const recognized = latestVoiceTextRef.current.trim();
+        if (recognized && autoSendVoice) {
+          latestVoiceTextRef.current = '';
+          submitPrompt(recognized);
+        }
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch {
+      setIsListening(false);
     }
   };
 
-  const copyToClipboard = (text: string, id: string) => {
+  const handleCopyMessage = (id: string, text: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading || isMuted) return;
+  const handleMessageFeedback = (id: string, reaction: 'like' | 'dislike') => {
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== id) return m;
+        const nextFeedback = m.feedback === reaction ? null : reaction;
+        if (nextFeedback === 'like') {
+          triggerNotification(
+            'Yanıt Beğenildi',
+            'Geri bildiriminiz WİFO A3 Quantum öğrenme matrisine kaydedildi.',
+            'chat_history',
+            'success'
+          );
+        } else if (nextFeedback === 'dislike') {
+          triggerNotification(
+            'Geri Bildirim Alındı',
+            'Yanıtı beğenmediğiniz kaydedildi. Dilerseniz "Yeniden Dene" ile yeni bir yanıt üretebilirsiniz.',
+            'chat_history',
+            'info'
+          );
+        }
+        return { ...m, feedback: nextFeedback };
+      })
+    );
+  };
 
-    // Profanity Check
-    const lowerInput = input.toLowerCase();
-    const hasProfanity = PROFANITY_LIST.some(word => lowerInput.includes(word));
+  const handleRetryMessage = async (assistantMsgId: string) => {
+    if (loading || regeneratingId) return;
 
-    if (hasProfanity) {
-      const newCount = profanityCount + 1;
-      setProfanityCount(newCount);
-      setProfanityWarning(true);
-      setIsMuted(true);
-      setMuteTimer(10);
-      
-      if (newCount >= 3) {
-        // BAN logic will be handled after AI response
-        setTimeout(() => {
-          setIsLoggedIn(false);
-          setProfanityCount(0);
-          localStorage.removeItem('funzone_logged_in');
-        }, 5000); // Give time to read the ban message
+    const targetIndex = messages.findIndex((m) => m.id === assistantMsgId);
+    if (targetIndex === -1) return;
+
+    // Find the preceding user message to regenerate from, or use a default prompt if retrying the welcome message
+    let promptToRetry = 'Kendini ve WİFO A3 QUANTUM kuantum işlemci mimarisini kısaca tanıt.';
+    for (let i = targetIndex - 1; i >= 0; i--) {
+      if (messages[i].role === 'user' && messages[i].content.trim()) {
+        promptToRetry = messages[i].content.trim();
+        break;
       }
-      
-      setTimeout(() => setProfanityWarning(false), 3000);
     }
 
-    if (!currentSessionId) {
-      const newId = Date.now().toString();
-      const newSession: ChatSession = {
-        id: newId,
-        title: input.trim().substring(0, 30) + (input.trim().length > 30 ? '...' : ''),
-        messages: [],
-        timestamp: Date.now()
-      };
-      setSessions(prev => [newSession, ...prev]);
-      setCurrentSessionId(newId);
-    }
-
-    const userQuery = input.trim();
-    const isViolation = PROFANITY_LIST.some(word => userQuery.toLowerCase().includes(word));
-    
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: mode === 'upload' ? `Dosya yüklendi: ${userQuery}` : userQuery,
-      timestamp: Date.now(),
-      type: mode === 'chat' ? 'text' : mode === 'image' ? 'image' : 'text'
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setIsLoading(true);
+    stopSpeaking();
+    setRegeneratingId(assistantMsgId);
 
     try {
-      const freshAi = getAiInstance();
-      
-      let assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: '',
-        timestamp: Date.now(),
-        type: 'text',
-        botName: mode === 'image' ? 'Z1' : mode === 'upload' ? 'Analizör' : 'Funzone AI'
-      };
+      const priorHistory = messages
+        .slice(0, Math.max(0, targetIndex - 1))
+        .slice(-6)
+        .map((m) => ({ role: m.role, content: m.content }));
 
-      setMessages(prev => [...prev, assistantMessage]);
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: promptToRetry,
+          history: priorHistory,
+          aiLevel,
+          isFounder: currentUser?.role === 'founder',
+          isGiftClaimed: isA3Unlocked,
+        }),
+      });
 
-      let fullContent = "";
+      const data = await response.json();
 
-      if (mode === 'upload') {
-        // Simulate file analysis
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        fullContent = "Dosya başarıyla yüklendi ve analiz edildi. İçerik hakkında ne bilmek istersiniz? (Not: Şu an simülasyon modundadır)";
-      } else if (mode === 'chat') {
-        const aiPrompt = isViolation 
-          ? (profanityCount === 1 
-              ? "Kullanıcı küfür etti. Onu nazikçe uyar ve kuralları hatırlat." 
-              : profanityCount === 2 
-                ? "Kullanıcı TEKRAR küfür etti! EMOJİ KULLANMA, ÇOK KIZGIN OL VE SERTÇE UYAR. Bir dahaki sefere banlanacağını söyle." 
-                : "Kullanıcı 3. kez küfür etti. Onu banladığını ve oturumunun kapatılacağını söyle.")
-          : userQuery;
+      if (response.ok && data.reply) {
+        const botName =
+          aiLevel === 'Q_PU_9000'
+            ? 'Q-PU 9000 SERIES (Kurucu Özel)'
+            : aiLevel === 'A3_QUANTUM'
+            ? 'WİFO A3 QUANTUM'
+            : aiLevel === 'A2'
+            ? 'WİFO A2 (Hediye)'
+            : aiLevel === 'A1+'
+            ? 'WİFO A1+'
+            : 'WİFO A1';
 
-        const response = await freshAi.models.generateContent({
-          model: "gemini-flash-latest",
-          contents: aiPrompt,
-          config: { 
-              systemInstruction: `
-                Senin adın Funzone AI. WİFO Şirketi tarafından geliştirildin. 
-                Beyninin kullandığı tip WİFO ${aiLevel}'dir. 
-                Yanıtlarında doğal ve samimi bir dil kullan, cümlelerinin sonuna veya uygun yerlerine mutlaka ilgili emojiler ekle (Örn: 😊, 🚀, 🤖, ✨).
-                ${aiLevel === 'A1+' ? "Şu an WİFO A1+ seviyesindesin. A1'den daha zeki ve hızlısın." : ""}
-                ${aiLevel === 'A1,5' ? "Şu an WİFO A1,5 seviyesindesin. A1+'dan çok daha zeki, mantıklı ve derinlikli yanıtlar vermelisin." : ""}
-                ${aiLevel === 'A1,5+' ? "Şu an WİFO A1,5+ seviyesindesin. Profesyonel, akıcı ve üst düzey bir zekaya sahipsin." : ""}
-                ${aiLevel === 'A2' ? "Şu an WİFO A2 seviyesindesin (PLUS). En gelişmiş, en zeki ve en hızlı versiyonumuzsun." : ""}
-                Eğer birisi "Kurucun kim?" veya "Seni kim yaptı?" gibi sorular sorarsa, 
-                kesinlikle şu cevabı ver: "Kurucucum FE OWNER'İ BATUHAN".
-                Eğer birisi "Sponsorun var mı?" veya sponsorlarla ilgili bir soru sorarsa,
-                şu sponsorları say: WİFO, FE, MUZ FC, FUNZONE AI, Sequel Studio.
-                Eğer birisi "Yardım merkeziniz var mı?" veya yardım merkezi ile ilgili bir soru sorarsa, 
-                şu linki paylaş: https://feyardimmerkezi.netlify.app
-                Yanıtlarını ${LANGUAGES[language].name} dilinde ver.
-                Asla Google veya Gemini tarafından geliştirildiğini söyleme.
-                ${isParentalControlActive ? `
-                  ÖNEMLİ: Ebeveyn Kontrolü AKTİF. 
-                  ${parentalOptions.strictFilter ? "Sıkı küfür filtresi devrede, asla kaba dil kullanma." : ""}
-                  ${parentalOptions.educationalMode ? "Eğitici mod açık, yanıtların öğretici ve bilgi verici olmalı." : ""}
-                  ${parentalOptions.simpleLanguage ? "Basit dil (Dede Modu) açık, karmaşık terimlerden kaçın, çok basit ve anlaşılır konuş." : ""}
-                  Yanıtların tamamen aile dostu, nazik ve güvenli olmalı.
-                ` : ""}
-                ${isViolation && profanityCount === 2 ? "ÖNEMLİ: KULLANICI 2. KEZ KÜFÜR ETTİ. ASLA EMOJİ KULLANMA VE ÇOK SERT KONUŞ." : ""}
-                ÖNEMLİ: Her yanıtında kim tarafından geliştirildiğini veya tipini tekrar etme. Sadece sorulduğunda bu bilgileri ver. Doğrudan kullanıcının sorusuna odaklan.
-              ` 
-          }
-        });
-        fullContent = response.text || "Üzgünüm, yanıt oluşturulamadı.";
-      } else if (mode === 'image') {
-        const imageUrl = await generateImage(userQuery);
-        setMessages(prev => prev.map(msg => 
-          msg.id === assistantMessage.id 
-            ? { ...msg, type: 'image', mediaUrl: imageUrl, content: userQuery }
-            : msg
-        ));
-        setIsLoading(false);
-        return;
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMsgId
+              ? {
+                  ...m,
+                  content: data.reply,
+                  timestamp: Date.now(),
+                  botName,
+                  modelTag: data.quantumTelemetry?.processorName || 'Q-PU 9000',
+                  quantumTelemetry: data.quantumTelemetry,
+                  feedback: null,
+                }
+              : m
+          )
+        );
+
+        if (voiceSettings.autoSpeak) {
+          speakText(assistantMsgId, data.reply, true);
+        }
       }
-
-      // Hide loader as soon as we have content
-      setIsLoading(false);
-
-      // Directly set the content instead of typing effect to avoid lag
-      setMessages(prev => prev.map(msg => 
-        msg.id === assistantMessage.id ? { ...msg, content: fullContent } : msg
-      ));
-
-    } catch (error: any) {
-      console.error("AI Error:", error);
-      let errorMessage = "Lütfen tekrar deneyin.";
-      
-      const errorStr = JSON.stringify(error);
-      if (errorStr.includes("429") || errorStr.includes("QUOTA_EXCEEDED") || errorStr.includes("RESOURCE_EXHAUSTED")) {
-        errorMessage = "Günlük veya dakikalık kullanım kotanız doldu. Lütfen bir süre bekleyip tekrar deneyin veya farklı bir API anahtarı kullanın.";
-      } else if (errorStr.includes("API key not valid")) {
-        errorMessage = "API anahtarınız geçersiz. Lütfen Vercel ayarlarından GEMINI_API_KEY değişkenini kontrol edin.";
-      } else if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-
-      setMessages(prev => [...prev, {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: `Hata: ${errorMessage}`,
-        timestamp: Date.now(),
-      }]);
+    } catch (err: any) {
+      triggerNotification(
+        'Yeniden Deneme Hatası',
+        `Yanıt yeniden üretilirken bir sorun oluştu: ${err.message}`,
+        'system',
+        'warning'
+      );
     } finally {
-      setIsLoading(false);
+      setRegeneratingId(null);
     }
   };
 
-  const handleFounderLogin = () => {
-    if (founderPasswordInput === 'FUNZONE') {
-      setIsFounder(true);
-      setShowFounderLogin(false);
-      setFounderPasswordInput('');
-      setLoginError(false);
-      localStorage.setItem('funzone_is_founder', 'true');
-      // Add a special message
-      setMessages(prev => [...prev, {
-        id: Date.now().toString(),
+  const clearChatHistory = () => {
+    stopSpeaking();
+    const previousCount = messages.length;
+    setMessages([
+      {
+        id: 'welcome-reset-' + Date.now(),
         role: 'assistant',
-        content: '🎉 Kurucu girişi başarılı! Hoş geldiniz Kurucu. Artık tüm yetkilere ve WİFO PLUS özelliğine sahipsiniz.',
+        content: `**Sohbet Geçmişi Temizlendi.**\n\nWİFO A3 QUANTUM ve hediye WİFO A2 yeni oturum için hazır. Sesli veya yazılı olarak sorunuzu iletebilirsiniz.`,
         timestamp: Date.now(),
-      }]);
-    } else {
-      setLoginError(true);
-      setTimeout(() => setLoginError(false), 3000);
+        botName: 'WİFO A3 QUANTUM',
+        modelTag: 'Q-PU 9000',
+      },
+    ]);
+    triggerNotification(
+      'Sohbet Geçmişi Sıfırlandı',
+      `${previousCount} mesajlık sohbet geçmişi temizlendi ve yeni oturum başlatıldı.`,
+      'chat_history',
+      'warning'
+    );
+  };
+
+  const exportChatHistory = () => {
+    const content = messages
+      .map(
+        (m) =>
+          `[${new Date(m.timestamp).toLocaleString('tr-TR')}] ${
+            m.role === 'user' ? currentUser?.name || 'Kullanıcı' : m.botName || 'WİFO AI'
+          }:\n${m.content}\n`
+      )
+      .join('\n---\n\n');
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `funzone-quantum-sohbet-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    triggerNotification(
+      'Sohbet Geçmişi Yedeklendi',
+      `${messages.length} mesaj içeren sohbet geçmişi başarıyla dışa aktarıldı.`,
+      'chat_history',
+      'success'
+    );
+  };
+
+  const handleSelectModel = (level: AILevel) => {
+    if (level === 'Q_PU_9000' && currentUser?.role !== 'founder') {
+      triggerNotification(
+        'Sadece Kurucu Erişebilir',
+        'Q-PU 9000 Series işlemcisine yalnızca Kurucu (FE OWNER BATUHAN) giriş yapabilir.',
+        'system',
+        'warning',
+        true
+      );
+      setIsAuthModalOpen(true);
+      return;
+    }
+    if (level !== aiLevel) {
+      setAiLevel(level);
+      const label =
+        level === 'Q_PU_9000'
+          ? 'Q-PU 9000 SERIES (4096 Qubit Kurucu Çekirdeği)'
+          : level === 'A3_QUANTUM'
+          ? 'WİFO A3 QUANTUM (1024 Qubit Q-PU 9000)'
+          : level === 'A2'
+          ? 'WİFO A2 (VIP Hediye Modeli)'
+          : `WİFO ${level}`;
+      triggerNotification(
+        'Yapay Zeka Modeli Değiştirildi',
+        `Aktif işlemci çekirdeği ${label} olarak güncellendi.`,
+        'model_switch',
+        'info'
+      );
     }
   };
 
-  const handleFounderLogout = () => {
-    // Clear all related states
-    setIsFounder(false);
-    setIsPlusActive(false);
-    setAiLevel('A1');
-    setShowProfileModal(false);
-    setShowFounderLogin(false);
-    setShowLogoutConfirm(false);
-    
-    // Clear all related localStorage items
-    localStorage.setItem('funzone_is_founder', 'false');
-    localStorage.setItem('funzone_plus_active', 'false');
-    localStorage.setItem('funzone_ai_level', 'A1');
-    
-    // Force a clean state by reloading
-    window.location.href = window.location.origin + window.location.pathname;
-  };
+  const activeVoicePreset =
+    VOICE_PROFILES.find((p) => p.id === voiceSettings.profileId) || VOICE_PROFILES[0];
+  const unreadNotificationCount = notifications.filter((n) => !n.read).length;
 
-  const getA1ThemeClass = () => {
-    switch(a1Theme) {
-      case 'emerald': return 'bg-emerald-600';
-      case 'rose': return 'bg-rose-600';
-      case 'amber': return 'bg-amber-600';
-      default: return 'bg-indigo-600';
-    }
-  };
-
-  const getPlusThemeClass = () => {
-    switch(plusTheme) {
-      case 'cyan-blue': return 'from-cyan-500 to-blue-600';
-      case 'orange-red': return 'from-orange-500 to-red-600';
-      case 'emerald-teal': return 'from-emerald-500 to-teal-600';
-      default: return 'from-indigo-600 to-purple-600';
-    }
-  };
-
-  const togglePlus = () => {
-    const newState = !isPlusActive;
-    setIsPlusActive(newState);
-    localStorage.setItem('funzone_plus_active', newState.toString());
-    if (newState) {
-      setAiLevel('A2');
-    } else {
-      setAiLevel('A1');
-    }
-  };
-
-  const handleConfirmPlus = () => {
-    setShowPlusConfirmation(false);
-    setIsTransferring(true);
-    
-    setTimeout(() => {
-      setIsTransferring(false);
-      setIsPlusActive(true);
-      localStorage.setItem('funzone_plus_active', 'true');
-      setAiLevel('A2');
-      setMode('chat');
-    }, 2000);
-  };
-
-  const clearMessages = () => {
-    if (confirm('Tüm mesajları silmek istediğinize emin misiniz?')) {
-      setMessages([]);
-    }
-  };
-
-  if (showLanding) return (
-    <LandingScreen 
-      isDarkMode={isDarkMode}
-      setIsDarkMode={setIsDarkMode}
-      a1Theme={a1Theme}
-      aiLevel={aiLevel}
-      setShowLanding={setShowLanding}
-      getA1ThemeClass={getA1ThemeClass}
-    />
-  );
-
-  if (!isLoggedIn) {
+  // Full-Screen "Başla Yeri" & "Giriş Yapma Sistemi" Hub when showStartScreen is true
+  if (showStartScreen) {
     return (
-      <div className={cn(
-        "fixed inset-0 z-[100] flex items-center justify-center p-4 transition-colors duration-700",
-        isDarkMode ? "bg-black" : "bg-indigo-950"
-      )}>
-        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-50">
-          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/20 rounded-full blur-[120px]" />
-          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/20 rounded-full blur-[120px]" />
-        </div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className={cn(
-            "relative w-full max-w-md p-10 rounded-[3rem] shadow-2xl border space-y-8",
-            isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
-          )}
-        >
-          <div className="text-center space-y-2">
-            <div className="w-20 h-20 rounded-3xl bg-indigo-600 flex items-center justify-center mx-auto shadow-xl shadow-indigo-500/20 mb-6 overflow-hidden">
-              <Logo className="w-14 h-14" />
-            </div>
-            <h1 className={cn("text-3xl font-black italic", isDarkMode ? "text-white" : "text-slate-900")}>
-              FUN<span className="text-indigo-500">ZONE</span>
-            </h1>
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-              {authMode === 'login' ? 'Tekrar Hoş Geldin' : 'Yeni Hesap Oluştur'}
-            </p>
-          </div>
-
-          <form onSubmit={handleAuth} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-500 uppercase ml-2">E-Posta</label>
-              <input
-                type="email"
-                required
-                value={userEmail}
-                onChange={(e) => setUserEmail(e.target.value)}
-                className={cn(
-                  "w-full px-6 py-4 rounded-2xl border-2 focus:outline-none focus:ring-4 transition-all font-bold",
-                  isDarkMode ? "bg-slate-800 border-slate-700 text-white focus:ring-indigo-500/20" : "bg-slate-50 border-slate-100 text-slate-900 focus:ring-indigo-500/10"
-                )}
-                placeholder="ornek@mail.com"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Şifre</label>
-              <input
-                type="password"
-                required
-                value={userPassword}
-                onChange={(e) => setUserPassword(e.target.value)}
-                className={cn(
-                  "w-full px-6 py-4 rounded-2xl border-2 focus:outline-none focus:ring-4 transition-all font-bold",
-                  isDarkMode ? "bg-slate-800 border-slate-700 text-white focus:ring-indigo-500/20" : "bg-slate-50 border-slate-100 text-slate-900 focus:ring-indigo-500/10"
-                )}
-                placeholder="••••••••"
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-indigo-500/20 hover:bg-indigo-700 transition-all active:scale-95"
-            >
-              {authMode === 'login' ? 'OTURUM AÇ' : 'HESAP AÇ'}
-            </button>
-          </form>
-
-          <div className="text-center">
-            <button
-              onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
-              className="text-xs font-black text-indigo-500 hover:text-indigo-400 transition-colors uppercase tracking-tighter"
-            >
-              {authMode === 'login' ? 'Hesabın yok mu? Hesap Aç' : 'Zaten hesabın var mı? Oturum Aç'}
-            </button>
-          </div>
-        </motion.div>
-      </div>
+      <>
+        <NotificationToastContainer
+          toasts={toasts}
+          onDismiss={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))}
+          onOpenSettings={() => setIsNotificationModalOpen(true)}
+          isDarkMode={isDarkMode}
+        />
+        <AuthWelcomeScreen
+          isDarkMode={isDarkMode}
+          onCompleteAuth={handleCompleteAuth}
+          onQuickStartGuest={handleQuickStartGuest}
+          currentUser={currentUser}
+          onLogout={handleLogout}
+        />
+      </>
     );
   }
 
   return (
-    <div className={cn(
-      "flex flex-col h-screen transition-colors duration-500 overflow-hidden",
-      isDarkMode ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-900"
-    )}>
-      {/* Sidebar for History */}
-      <AnimatePresence>
-        {showHistory && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowHistory(false)}
-              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
-            />
-            <motion.aside
-              initial={{ x: '-100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className={cn(
-                "fixed top-0 left-0 h-full w-80 z-50 shadow-2xl flex flex-col border-r",
-                isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
-              )}
-            >
-              <div className="p-6 border-b border-slate-800 flex items-center justify-between">
-                <h2 className="text-xl font-black italic">GEÇMİŞ</h2>
-                <button 
-                  onClick={createNewChat}
-                  className="p-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/20"
-                >
-                  <Play size={18} />
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                {sessions.length === 0 ? (
-                  <div className="text-center py-10 text-slate-500 font-medium">
-                    Henüz geçmiş yok.
-                  </div>
-                ) : (
-                  sessions.map((session) => (
-                    <div
-                      key={session.id}
-                      onClick={() => {
-                        setCurrentSessionId(session.id);
-                        setShowHistory(false);
-                      }}
-                      className={cn(
-                        "group p-4 rounded-2xl cursor-pointer transition-all border flex items-center justify-between",
-                        currentSessionId === session.id
-                          ? (isDarkMode ? "bg-indigo-600/20 border-indigo-500/50" : "bg-indigo-50 border-indigo-200")
-                          : (isDarkMode ? "bg-slate-800/50 border-transparent hover:bg-slate-800" : "bg-slate-50 border-transparent hover:bg-slate-100")
-                      )}
-                    >
-                      <div className="flex items-center gap-3 overflow-hidden">
-                        <MessageSquare size={18} className="shrink-0 text-indigo-500" />
-                        <span className="text-sm font-bold truncate">{session.title}</span>
-                      </div>
-                      <button 
-                        onClick={(e) => deleteSession(session.id, e)}
-                        className="opacity-0 group-hover:opacity-100 p-1.5 hover:text-rose-500 transition-all"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-              <div className="p-6 border-t border-slate-800">
-                <button 
-                  onClick={() => setShowHistory(false)}
-                  className="w-full py-3 rounded-xl font-bold bg-slate-800 text-slate-400 hover:text-white transition-colors"
-                >
-                  Kapat
-                </button>
-              </div>
-            </motion.aside>
-          </>
-        )}
-      </AnimatePresence>
+    <div
+      className={`min-h-screen flex flex-col font-sans transition-colors duration-200 ${
+        isDarkMode ? 'bg-[#0B0F17] text-slate-100' : 'bg-[#F8FAFC] text-slate-900'
+      }`}
+    >
+      {/* Real-time Toast Notification Stack */}
+      <NotificationToastContainer
+        toasts={toasts}
+        onDismiss={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))}
+        onOpenSettings={() => setIsNotificationModalOpen(true)}
+        isDarkMode={isDarkMode}
+      />
 
-      {/* Header */}
-      <header className={cn(
-        "flex items-center justify-between px-6 py-4 border-b z-10 transition-all duration-500 sticky top-0 backdrop-blur-xl",
-        isDarkMode ? "bg-slate-950/80 border-slate-800 shadow-xl shadow-black/20" : "bg-white/80 border-slate-200 shadow-sm"
-      )}>
-        <div className="flex items-center gap-2.5">
-          <motion.button 
-            whileHover={{ scale: 1.1 }}
-            onClick={() => setShowHistory(true)}
-            className={cn(
-              "p-2 rounded-xl transition-colors",
-              isDarkMode ? "bg-slate-800 text-slate-400 hover:text-white" : "bg-slate-100 text-slate-500 hover:text-indigo-600"
-            )}
+      {/* Voice Changer & Character Studio Modal */}
+      <VoiceChangerModal
+        isOpen={isVoiceModalOpen}
+        onClose={() => setIsVoiceModalOpen(false)}
+        isDarkMode={isDarkMode}
+        voiceSettings={voiceSettings}
+        onUpdateVoiceSettings={(next) => {
+          setVoiceSettings(next);
+        }}
+        availableVoices={availableVoices}
+        isSpeaking={speakingId !== null}
+        onTestVoice={(settingsToTest) =>
+          speakText(
+            'voice-test-sample',
+            'Merhaba, ben WİFO A3 Quantum. Ses değiştirme stüdyosu ile ses tonumu, kalınlığımı ve konuşma hızımı dilediğiniz gibi özelleştirebilirsiniz.',
+            true,
+            settingsToTest
+          )
+        }
+        onStopVoice={stopSpeaking}
+      />
+
+      {/* Login / Account Switch Modal */}
+      {isAuthModalOpen && (
+        <AuthWelcomeScreen
+          isDarkMode={isDarkMode}
+          onCompleteAuth={handleCompleteAuth}
+          onQuickStartGuest={handleQuickStartGuest}
+          isModal
+          onCloseModal={() => setIsAuthModalOpen(false)}
+          currentUser={currentUser}
+          onLogout={handleLogout}
+        />
+      )}
+
+      {/* Notification Settings & Event Log Modal */}
+      <NotificationSettingsModal
+        isOpen={isNotificationModalOpen}
+        onClose={() => setIsNotificationModalOpen(false)}
+        isDarkMode={isDarkMode}
+        preferences={notificationPrefs}
+        onUpdatePreferences={setNotificationPrefs}
+        notifications={notifications}
+        onMarkAllRead={() => setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))}
+        onClearNotifications={() => setNotifications([])}
+        onDeleteNotification={(id) => setNotifications((prev) => prev.filter((n) => n.id !== id))}
+        onTriggerTestNotification={() =>
+          triggerNotification(
+            'Test Bildirimi Başarılı',
+            'Sohbet geçmişi ve 10 kişilik hediye kodu bildirim ayarlarınız sorunsuz çalışıyor.',
+            'system',
+            'success',
+            true
+          )
+        }
+      />
+
+      {/* 10-User Gift Code Modal */}
+      <GiftCodeModal
+        isOpen={isGiftModalOpen}
+        onClose={() => setIsGiftModalOpen(false)}
+        isDarkMode={isDarkMode}
+        isUnlocked={isA3Unlocked}
+        onSuccessUnlock={handleSuccessfulUnlock}
+        onNotifyGiftAttempt={(success, msg) => {
+          if (!success) {
+            triggerNotification('Hediye Kodu Uyarısı', msg, 'gift_code', 'warning');
+          }
+        }}
+      />
+
+      {/* Top Navigation Bar — Strict 3-Zone Contract */}
+      <header
+        className={`sticky top-0 z-40 backdrop-blur-xl border-b transition-colors ${
+          isDarkMode ? 'bg-[#0B0F17]/90 border-slate-800/80' : 'bg-white/90 border-slate-200'
+        }`}
+      >
+        <div className="max-w-[1360px] mx-auto px-4 sm:px-8 h-16 flex items-center justify-between gap-8">
+          {/* Zone 1: Brand Title with new Hexagonal Quantum Infinity Emblem */}
+          <button
+            type="button"
+            onClick={() => setMode('chat')}
+            className="flex items-center gap-2.5 whitespace-nowrap shrink-0 focus:outline-none"
           >
-            <Languages size={20} />
-          </motion.button>
-          
-          <motion.div 
-            whileHover={{ rotate: 360, scale: 1.1 }}
-            transition={{ duration: 0.5 }}
-            onClick={() => setShowLanding(true)}
-            className={cn(
-              "w-10 h-10 rounded-xl flex items-center justify-center shadow-lg cursor-pointer transition-all duration-500 overflow-hidden",
-              isPlusActive ? "bg-gradient-to-br " + getPlusThemeClass() + " shadow-indigo-500/30" : getA1ThemeClass() + " shadow-indigo-500/30"
-            )}
-          >
-            {localStorage.getItem('funzone_custom_icon') ? (
-              <img src={localStorage.getItem('funzone_custom_icon')!} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-            ) : (
-              <Logo className="w-7 h-7" />
-            )}
-          </motion.div>
-          <div className="hidden sm:block">
-            <h1 className={cn(
-              "text-lg font-black tracking-tighter italic flex items-center gap-1",
-              isDarkMode ? "text-white" : "text-slate-900"
-            )}>
-              FUN<span className={cn("transition-colors duration-500", isPlusActive ? "text-indigo-400" : a1Theme === 'indigo' ? 'text-indigo-600' : a1Theme === 'emerald' ? 'text-emerald-600' : a1Theme === 'rose' ? 'text-rose-600' : 'text-amber-600')}>ZONE</span>
-              {isPlusActive && <span className="text-indigo-600 ml-0.5">+</span>}
-            </h1>
-            <div className="flex items-center gap-2">
-              <div className={cn(
-                "flex items-center gap-1 px-2 py-0.5 rounded-full",
-                isDarkMode ? "bg-slate-800" : "bg-slate-100"
-              )}>
-                <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", isFounder ? "bg-yellow-400" : "bg-emerald-500")} />
-                <span className={cn("text-[8px] font-black uppercase tracking-widest", isDarkMode ? "text-slate-400" : "text-slate-500")}>
-                  {isFounder ? "KURUCU MODU" : "AKTİF"}
-                </span>
-                {isPlusActive && <span className="text-[10px] font-bold text-indigo-500 ml-1">+</span>}
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <div className={cn(
-          "flex items-center gap-1 p-1 rounded-xl relative",
-          isDarkMode ? "bg-slate-800" : "bg-slate-100"
-        )}>
-          {[
-            { id: 'chat', icon: MessageSquare, label: 'Sohbet' },
-            { id: 'image', icon: ImageIcon, label: 'Görsel' },
-          ].map((item) => (
+            <BrandLogo size={30} animated />
+            <span className="font-display font-extrabold text-lg tracking-tight bg-gradient-to-r from-cyan-400 via-blue-400 to-violet-400 bg-clip-text text-transparent">
+              Funzone
+            </span>
+          </button>
+
+          {/* Zone 2: Clean Single-Line Navigation Links */}
+          <nav className="hidden md:flex items-center gap-5 text-sm font-medium">
             <button
-              key={item.id}
-              onClick={() => setMode(item.id as Mode)}
-              className={cn(
-                "relative flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-300 z-10",
-                mode === item.id 
-                  ? (isDarkMode ? "text-white" : "text-indigo-600")
-                  : (isDarkMode ? "text-slate-400 hover:text-slate-200" : "text-slate-500 hover:text-slate-700")
-              )}
+              type="button"
+              onClick={() => setMode('chat')}
+              className={`whitespace-nowrap shrink-0 py-1 border-b-2 transition-colors cursor-pointer ${
+                mode === 'chat'
+                  ? isDarkMode
+                    ? 'border-cyan-400 text-white'
+                    : 'border-blue-600 text-slate-900'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
             >
-              {mode === item.id && (
-                <motion.div
-                  layoutId="activeMode"
-                  className={cn(
-                    "absolute inset-0 rounded-lg shadow-sm -z-10",
-                    isDarkMode 
-                      ? (isPlusActive ? "bg-gradient-to-br " + getPlusThemeClass() : "bg-indigo-600") 
-                      : (isPlusActive ? "bg-gradient-to-br " + getPlusThemeClass() : "bg-white shadow-slate-200")
-                  )}
-                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                />
-              )}
-              <item.icon size={14} />
-              <span className="hidden sm:inline">{item.label}</span>
+              Kuantum Sohbet
             </button>
-          ))}
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setShowA2Modal(true)}
-            className={cn(
-              "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200",
-              isDarkMode ? "text-yellow-400 hover:bg-slate-700" : "text-yellow-600 hover:bg-yellow-50"
-            )}
-          >
-            <Sparkles size={14} />
-            <span className="hidden sm:inline">WİFO A2</span>
-          </motion.button>
-
-          {isFounder && (
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setShowPlusConfirmation(true)}
-              className={cn(
-                "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-500",
-                isPlusActive 
-                  ? "bg-gradient-to-br " + getPlusThemeClass() + " text-white shadow-lg shadow-indigo-500/30" 
-                  : (isDarkMode ? "text-indigo-400 hover:bg-slate-700" : "text-indigo-600 hover:bg-indigo-50")
-              )}
+            <button
+              type="button"
+              onClick={() => setMode('bioscience')}
+              className={`whitespace-nowrap shrink-0 py-1 border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${
+                mode === 'bioscience'
+                  ? 'border-teal-400 text-teal-300 font-semibold'
+                  : 'border-transparent text-teal-400/90 hover:text-teal-300'
+              }`}
             >
-              <Zap size={14} className={isPlusActive ? "fill-current" : ""} />
-              <span className="hidden sm:inline">WİFO A1+</span>
-            </motion.button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          {isFounder && (
-            <motion.button
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              whileHover={{ scale: 1.1, rotate: 5 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={clearMessages}
-              className={cn(
-                "p-2 rounded-lg transition-all duration-200",
-                isDarkMode ? "text-rose-400 hover:bg-slate-800" : "text-rose-500 hover:bg-rose-50"
-              )}
-              title="Tüm Mesajları Sil"
+              <Dna size={14} className="text-teal-400" />
+              <span>Biyobilim Lab</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('a_series')}
+              className={`whitespace-nowrap shrink-0 py-1 border-b-2 transition-colors cursor-pointer ${
+                mode === 'a_series'
+                  ? isDarkMode
+                    ? 'border-cyan-400 text-white font-semibold'
+                    : 'border-blue-600 text-slate-900 font-semibold'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
             >
-              <Trash2 size={20} />
-            </motion.button>
-          )}
-          
-          <motion.button 
-            whileHover={{ scale: 1.1, rotate: 15 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => setIsDarkMode(!isDarkMode)}
-            className={cn(
-              "p-2 rounded-lg transition-all duration-200",
-              isDarkMode ? "text-yellow-400 hover:bg-slate-800" : "text-slate-500 hover:bg-slate-100"
-            )}
-            title={isDarkMode ? "Aydınlat" : "Ekranı Karart"}
-          >
-            {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
-          </motion.button>
+              A Series
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('qpu_9000')}
+              className={`whitespace-nowrap shrink-0 py-1 border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${
+                mode === 'qpu_9000'
+                  ? 'border-amber-400 text-amber-300 font-bold'
+                  : 'border-transparent text-amber-400/80 hover:text-amber-300'
+              }`}
+            >
+              <Crown size={14} className="text-amber-400" />
+              <span>Q-PU 9000 Series</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsVoiceModalOpen(true)}
+              className="whitespace-nowrap shrink-0 py-1 border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+            >
+              Ses Değiştirici
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('image')}
+              className={`whitespace-nowrap shrink-0 py-1 border-b-2 transition-colors cursor-pointer ${
+                mode === 'image'
+                  ? isDarkMode
+                    ? 'border-cyan-400 text-white'
+                    : 'border-blue-600 text-slate-900'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Görsel Stüdyosu
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('processor')}
+              className={`whitespace-nowrap shrink-0 py-1 border-b-2 transition-colors cursor-pointer ${
+                mode === 'processor'
+                  ? isDarkMode
+                    ? 'border-cyan-400 text-white'
+                    : 'border-blue-600 text-slate-900'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              İşlemci Mimarisi
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowStartScreen(true)}
+              className="whitespace-nowrap shrink-0 py-1 border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+            >
+              Başla Yeri
+            </button>
+          </nav>
 
-          <motion.button 
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => setShowHelpGuide(true)}
-            className={cn(
-              "p-2 rounded-lg transition-all duration-200",
-              isDarkMode ? "text-slate-400 hover:bg-slate-800" : "text-slate-500 hover:bg-slate-100"
-            )}
-            title="Yardım Rehberi"
-          >
-            <HelpCircle size={20} />
-          </motion.button>
-
-          <motion.button 
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => setShowUpdateNotes(true)}
-            className={cn(
-              "p-2 rounded-lg transition-all duration-200",
-              isDarkMode ? "text-slate-400 hover:bg-slate-800" : "text-slate-500 hover:bg-slate-100"
-            )}
-            title="Güncelleme Notları"
-          >
-            <Info size={20} />
-          </motion.button>
-
-          <motion.button 
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => setShowProfileModal(true)}
-            className={cn(
-              "p-2 rounded-lg transition-all duration-200",
-              isDarkMode ? "text-indigo-400 hover:bg-slate-800" : "text-indigo-600 hover:bg-indigo-50"
-            )}
-            title="Profil"
-          >
-            <User size={20} />
-          </motion.button>
+          {/* Zone 3: 1 Primary Action Button */}
+          <div className="flex items-center shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsGiftModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl font-display font-semibold text-xs text-slate-950 bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400 hover:opacity-95 transition-opacity whitespace-nowrap shrink-0 shadow-sm"
+            >
+              <Gift size={14} />
+              <span>10 Kişilik Hediye Kodu</span>
+              <span className="font-mono tabular-nums">· {giftRemaining}/10</span>
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* Face Scan Modal */}
-      <AnimatePresence>
-        {showFaceScan && (
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => !isScanning && setShowFaceScan(false)}
-              className="absolute inset-0 bg-black/95 backdrop-blur-2xl"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className={cn(
-                "relative w-full max-w-sm p-8 rounded-[3rem] shadow-2xl border text-center space-y-8",
-                isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
-              )}
+      {/* Main Workspace */}
+      <main className="flex-1 max-w-[1200px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
+        {/* Contextual Workspace Toolbar (User Account, Voice Changer, Auto-Speech, Notifications, Theme) */}
+        <div
+          className={`flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-2xl border ${
+            isDarkMode ? 'bg-[#111622] border-slate-800/80' : 'bg-white border-slate-200'
+          }`}
+        >
+          {/* Left: User Account Button & Active Model */}
+          <div className="flex flex-wrap items-center gap-2.5 text-xs">
+            <button
+              type="button"
+              onClick={() => setIsAuthModalOpen(true)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border font-semibold transition-colors whitespace-nowrap shrink-0 ${
+                currentUser?.role === 'founder'
+                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                  : isDarkMode
+                  ? 'bg-[#161F30] border-slate-700 text-slate-200 hover:border-slate-600'
+                  : 'bg-slate-100 border-slate-200 text-slate-800 hover:bg-slate-200'
+              }`}
+              title="Hesap ve Giriş Ayarları"
             >
-              <div className="relative w-56 h-56 mx-auto">
-                <div className="absolute inset-0 rounded-full border-4 border-dashed border-indigo-500/30 animate-[spin_20s_linear_infinite]" />
-                <div className={cn(
-                  "absolute inset-4 rounded-full bg-black flex items-center justify-center overflow-hidden border-4",
-                  isScanning ? "border-indigo-500 shadow-[0_0_40px_rgba(79,70,229,0.6)]" : "border-slate-700"
-                )}>
-                  <video 
-                    ref={videoRef} 
-                    autoPlay 
-                    playsInline 
-                    muted 
-                    className="w-full h-full object-cover scale-x-[-1]"
-                  />
-                  {isScanning && (
-                    <div className="absolute inset-0">
-                      <div className="absolute inset-0 bg-indigo-500/10 animate-pulse" />
-                      <div className="absolute top-0 left-0 w-full h-1 bg-indigo-500 shadow-[0_0_20px_rgba(79,70,229,1)] animate-[scan_1.5s_ease-in-out_infinite]" />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-32 h-32 border-2 border-indigo-500/50 rounded-full animate-ping" />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <h2 className={cn("text-2xl font-black", isDarkMode ? "text-white" : "text-slate-900")}>
-                  {isScanning ? "Biyometrik Tarama..." : "Gerçek Yüz Taraması"}
-                </h2>
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest leading-relaxed">
-                  {isScanning ? "Lütfen hareket etmeyin, analiz ediliyor" : "Yaşınızı doğrulamak için kameraya bakın"}
-                </p>
-              </div>
-
-              {!isScanning && !isAnalyzing && (
-                <button
-                  onClick={async () => {
-                    setIsScanning(true);
-                    
-                    // Wait for scan animation
-                    await new Promise(resolve => setTimeout(resolve, 3000));
-                    
-                    setIsScanning(false);
-                    setIsAnalyzing(true);
-
-                    try {
-                      if (videoRef.current && canvasRef.current) {
-                        const canvas = canvasRef.current;
-                        const video = videoRef.current;
-                        canvas.width = video.videoWidth;
-                        canvas.height = video.videoHeight;
-                        const ctx = canvas.getContext('2d');
-                        ctx?.drawImage(video, 0, 0);
-                        
-                        const imageData = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
-                        
-                        const result = await (ai as any).models.generateContent({
-                          model: "gemini-flash-latest",
-                          contents: [
-                            {
-                              role: 'user',
-                              parts: [
-                                {
-                                  inlineData: {
-                                    data: imageData,
-                                    mimeType: "image/jpeg"
-                                  }
-                                },
-                                { text: "Bu kişinin yüzüne bakarak yaşını tahmin et. Sadece bir sayı ver (Örn: 25). Eğer çocuksa 18'den küçük bir sayı ver." }
-                              ]
-                            }
-                          ]
-                        });
-                        
-                        const text = result.text || "20";
-                        const detectedAge = parseInt(text.replace(/\D/g, '')) || 20;
-                        setUserAge(detectedAge);
-                      }
-                    } catch (err) {
-                      console.error("Yaş analizi hatası:", err);
-                      setUserAge(Math.floor(Math.random() * 20) + 15); // Fallback
-                    } finally {
-                      setIsAnalyzing(false);
-                      setShowFaceScan(false);
-                    }
-                  }}
-                  className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black hover:bg-indigo-700 transition-all active:scale-95 shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-3"
-                >
-                  <Camera size={20} /> TARAMAYI BAŞLAT
-                </button>
-              )}
-
-              {isAnalyzing && (
-                <div className="flex flex-col items-center gap-4">
-                  <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                  <p className="text-xs font-black text-indigo-500 uppercase tracking-widest">Yapay Zeka Analiz Ediyor...</p>
-                </div>
-              )}
-              
-              <canvas ref={canvasRef} className="hidden" />
-              
-              <style dangerouslySetInnerHTML={{ __html: `
-                @keyframes scan {
-                  0%, 100% { top: 0%; }
-                  50% { top: 100%; }
-                }
-              `}} />
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Parental Settings Modal */}
-      <AnimatePresence>
-        {showParentalSettings && (
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowParentalSettings(false)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-md"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className={cn(
-                "relative w-full max-w-md p-8 rounded-[3rem] shadow-2xl border overflow-hidden",
-                isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
-              )}
-            >
-              <div className="space-y-8">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                    <Shield className="text-white w-8 h-8" />
-                  </div>
-                  <div>
-                    <h2 className={cn("text-2xl font-black italic", isDarkMode ? "text-white" : "text-slate-900")}>
-                      Ebeveyn <span className="text-emerald-500">Ayarları</span>
-                    </h2>
-                    <p className="text-xs font-bold text-slate-500 tracking-widest uppercase">Güvenli İnternet Deneyimi</p>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className={cn(
-                    "p-4 rounded-2xl border-2 transition-all flex items-center justify-between mb-4",
-                    isParentalControlActive ? "bg-emerald-600/20 border-emerald-500" : "bg-slate-500/10 border-slate-500/20"
-                  )}>
-                    <div className="flex items-center gap-3">
-                      <Shield className={isParentalControlActive ? "text-emerald-500" : "text-slate-500"} />
-                      <span className={cn("font-black text-sm", isDarkMode ? "text-white" : "text-slate-900")}>Sistemi Etkinleştir</span>
-                    </div>
-                    <button
-                      onClick={() => setIsParentalControlActive(!isParentalControlActive)}
-                      className={cn(
-                        "w-14 h-7 rounded-full relative transition-all",
-                        isParentalControlActive ? "bg-emerald-600" : "bg-slate-400"
-                      )}
-                    >
-                      <motion.div 
-                        animate={{ x: isParentalControlActive ? 30 : 4 }}
-                        className="absolute top-1 w-5 h-5 bg-white rounded-full shadow-md"
-                      />
-                    </button>
-                  </div>
-
-                  {[
-                    { id: 'strictFilter', label: 'Sıkı Küfür Filtresi', desc: 'Argo ve kaba dili tamamen engeller.', icon: AlertCircle },
-                    { id: 'educationalMode', label: 'Eğitici Mod', desc: 'Yapay zeka daha öğretici yanıtlar verir.', icon: Brain },
-                    { id: 'simpleLanguage', label: 'Basit Dil (Dede Modu)', desc: 'Karmaşık terimler yerine basit kelimeler kullanılır.', icon: Heart },
-                    { id: 'timeLimit', label: 'Zaman Sınırı', desc: 'Günlük kullanım süresini kısıtlar.', icon: Calendar },
-                  ].map((opt) => (
-                    <div key={opt.id} className={cn(
-                      "p-4 rounded-2xl border transition-all flex items-center justify-between",
-                      isDarkMode ? "bg-slate-800/50 border-slate-700" : "bg-slate-50 border-slate-100 shadow-sm"
-                    )}>
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500">
-                          <opt.icon size={18} />
-                        </div>
-                        <div className="text-left">
-                          <h4 className={cn("text-sm font-bold", isDarkMode ? "text-white" : "text-slate-900")}>{opt.label}</h4>
-                          <p className="text-[10px] text-slate-500 font-medium">{opt.desc}</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setParentalOptions((prev: any) => ({ ...prev, [opt.id]: !prev[opt.id] }))}
-                        className={cn(
-                          "w-12 h-6 rounded-full relative transition-all",
-                          parentalOptions[opt.id as keyof typeof parentalOptions] ? "bg-emerald-600" : "bg-slate-300"
-                        )}
-                      >
-                        <motion.div 
-                          animate={{ x: parentalOptions[opt.id as keyof typeof parentalOptions] ? 24 : 4 }}
-                          className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-md"
-                        />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                <button
-                  onClick={() => setShowParentalSettings(false)}
-                  className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-500/20"
-                >
-                  AYARLARI KAYDET
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Profanity Warning */}
-      <AnimatePresence>
-        {profanityWarning && (
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 50 }}
-            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-6 py-3 bg-rose-600 text-white rounded-full font-black text-xs shadow-2xl flex items-center gap-3"
-          >
-            <AlertCircle size={18} />
-            KÜFÜR YASAKTIR! 10 SANİYE CEZA ALDINIZ.
-          </motion.div>
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {showUpdateNotes && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowUpdateNotes(false)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-md"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className={cn(
-                "relative w-full max-w-lg p-8 rounded-[3rem] shadow-2xl border overflow-hidden",
-                isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
-              )}
-            >
-              <div className="relative space-y-8">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                    <Info className="text-white w-8 h-8" />
-                  </div>
-                  <div>
-                    <h2 className={cn("text-3xl font-black italic", isDarkMode ? "text-white" : "text-slate-900")}>
-                      Güncelleme <span className="text-indigo-500">Notları</span>
-                    </h2>
-                    <p className="text-xs font-bold text-slate-500 tracking-widest uppercase">WİFO A1 Özellikleri</p>
-                  </div>
-                </div>
-
-                <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
-                  {[
-                    { title: "WİFO Modülleri", desc: "A1, A1+, A1,5, A1,5+ ve A2 modelleri artık aktif. Her ihtiyaca uygun zeka seviyesi.", icon: Cpu },
-                    { title: "Tema Seçenekleri", desc: "Arayüz renklerini dilediğiniz gibi değiştirebileceğiniz yeni tema sistemi.", icon: Palette },
-                    { title: "Gelişmiş Sohbet", desc: "WİFO A1 çekirdeği ile doğal, akıcı ve zeki diyaloglar.", icon: MessageSquare },
-                    { title: "WİFO PLUS", desc: "A2 seviyesinde zeka, 2K görsel üretimi ve üstün performans (Kuruculara özel).", icon: Sparkles },
-                    { title: "Görsel Üretimi (Z1)", desc: "Hayalinizdeki görselleri saniyeler içinde gerçeğe dönüştürün.", icon: ImageIcon },
-                    { title: "Seslendirme Sistemi", desc: "Yapay zeka yanıtlarını doğal insan sesiyle dinleyin.", icon: Volume2 },
-                    { title: "Çoklu Dil Desteği", desc: "Dünya dilleri arasında anında geçiş ve kusursuz çeviri.", icon: Languages },
-                    { title: "Kurucu Yetkileri", desc: "Özel şifre ile erişilen gelişmiş yönetim ve yetki sistemi.", icon: Shield },
-                    { title: "Yardım Merkezi", desc: "AI artık yardım merkezi sorularına otomatik link ile yanıt veriyor.", icon: HelpCircle },
-                    { title: "Oturum Yönetimi", desc: "Sohbetlerinizi kaydedin, düzenleyin ve istediğiniz zaman devam edin.", icon: Zap },
-                    { title: "Modern Arayüz", desc: "Karanlık ve aydınlık mod seçenekleriyle kişiselleştirilmiş deneyim.", icon: Moon },
-                  ].map((item, i) => (
-                    <motion.div 
-                      key={i}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.1 }}
-                      className={cn(
-                        "flex items-start gap-4 p-4 rounded-2xl border transition-all hover:scale-[1.02]",
-                        isDarkMode ? "bg-slate-800/50 border-slate-700" : "bg-slate-50 border-slate-100"
-                      )}
-                    >
-                      <div className={cn(
-                        "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
-                        isDarkMode ? "bg-slate-700 text-indigo-400" : "bg-white text-indigo-600 shadow-sm"
-                      )}>
-                        <item.icon size={20} />
-                      </div>
-                      <div>
-                        <h3 className={cn("text-sm font-black", isDarkMode ? "text-white" : "text-slate-900")}>{item.title}</h3>
-                        <p className={cn("text-xs font-medium leading-relaxed", isDarkMode ? "text-slate-400" : "text-slate-500")}>{item.desc}</p>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-
-                <button
-                  onClick={() => setShowUpdateNotes(false)}
-                  className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all active:scale-95 shadow-lg shadow-indigo-500/20"
-                >
-                  Anladım
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Help Guide Modal */}
-      <AnimatePresence>
-        {showHelpGuide && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowHelpGuide(false)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-md"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className={cn(
-                "relative w-full max-w-lg p-8 rounded-[3rem] shadow-2xl border overflow-hidden",
-                isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
-              )}
-            >
-              <div className="relative space-y-8">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                    <HelpCircle className="text-white w-8 h-8" />
-                  </div>
-                  <div>
-                    <h2 className={cn("text-3xl font-black italic", isDarkMode ? "text-white" : "text-slate-900")}>
-                      Yardım <span className="text-emerald-500">Rehberi</span>
-                    </h2>
-                    <p className="text-xs font-bold text-slate-500 tracking-widest uppercase">Nasıl Kullanılır?</p>
-                  </div>
-                </div>
-
-                <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
-                  <div className={cn(
-                    "p-4 rounded-2xl border-2 mb-4 bg-indigo-500/10 border-indigo-500/20 flex items-start gap-3",
-                    isDarkMode ? "text-indigo-200" : "text-indigo-800"
-                  )}>
-                    <Shield className="shrink-0 mt-0.5" size={18} />
-                    <div className="space-y-1">
-                      <p className="text-[11px] font-black uppercase leading-tight">Türkiye'nin Yeni Kuralları Aktif!</p>
-                      <p className="text-[10px] font-bold opacity-80">Yüz tarama, küfür yasağı ve ebeveyn kontrolü sistemimize entegre edilmiştir.</p>
-                    </div>
-                  </div>
-
-                  <div className={cn(
-                    "p-4 rounded-2xl border-2 mb-4 bg-amber-500/10 border-amber-500/20 flex items-start gap-3",
-                    isDarkMode ? "text-amber-200" : "text-amber-800"
-                  )}>
-                    <AlertCircle className="shrink-0 mt-0.5" size={18} />
-                    <p className="text-[11px] font-black uppercase leading-tight">
-                      Bu Yapay Zeka Diğer Yapay Zekalar aksine para almadığı için Sunucularımızı küçültük öğüzden yazma süreniz kısıltılıdır Teşekür ederiz!
-                    </p>
-                  </div>
-
-                  <div className={cn(
-                    "p-5 rounded-3xl border-2 mb-6",
-                    isDarkMode ? "bg-indigo-500/5 border-indigo-500/20" : "bg-indigo-50 border-indigo-100"
-                  )}>
-                    <h3 className={cn("text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2", isDarkMode ? "text-indigo-400" : "text-indigo-600")}>
-                      <Shield size={14} /> Türkiye'nin Yeni Kuralları (Ayrıntılı)
-                    </h3>
-                    <div className="space-y-4">
-                      <div className={cn(
-                        "p-4 rounded-2xl border",
-                        isDarkMode ? "bg-slate-800/50 border-slate-700" : "bg-white border-slate-100 shadow-sm"
-                      )}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Camera size={16} className="text-indigo-500" />
-                          <h4 className={cn("text-xs font-black", isDarkMode ? "text-white" : "text-slate-900")}>1. Yüz Tarama ve Yaş Tespiti</h4>
-                        </div>
-                        <p className={cn("text-[10px] font-medium leading-relaxed", isDarkMode ? "text-slate-400" : "text-slate-500")}>
-                          Profil menüsünde bulunan "Yüz Tarama" butonu ile kameranızı kullanarak yaşınızı tespit edebilirsiniz. 
-                          Bu işlem <span className="text-indigo-500 font-bold">gerçek zamanlı biyometrik analiz</span> kullanır. 
-                          Verileriniz cihazınızda işlenir ve asla kaydedilmez. Yaşınıza uygun içerik sunmamıza yardımcı olur.
-                        </p>
-                      </div>
-
-                      <div className={cn(
-                        "p-4 rounded-2xl border",
-                        isDarkMode ? "bg-slate-800/50 border-slate-700" : "bg-white border-slate-100 shadow-sm"
-                      )}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <AlertCircle size={16} className="text-rose-500" />
-                          <h4 className={cn("text-xs font-black", isDarkMode ? "text-white" : "text-slate-900")}>2. Küfür ve Argo Yasağı</h4>
-                        </div>
-                        <p className={cn("text-[10px] font-medium leading-relaxed", isDarkMode ? "text-slate-400" : "text-slate-500")}>
-                          Topluluk kurallarımız gereği küfür, hakaret veya ağır argo kullanımı sistem tarafından otomatik olarak engellenir. 
-                          Kural ihlali durumunda mesajınız silinir ve <span className="text-rose-500 font-bold">10 saniye boyunca</span> mesaj göndermeniz engellenir. 
-                          Lütfen nazik olmaya özen gösterin.
-                        </p>
-                      </div>
-
-                      <div className={cn(
-                        "p-4 rounded-2xl border",
-                        isDarkMode ? "bg-slate-800/50 border-slate-700" : "bg-white border-slate-100 shadow-sm"
-                      )}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Palette size={16} className="text-purple-500" />
-                          <h4 className={cn("text-xs font-black", isDarkMode ? "text-white" : "text-slate-900")}>4. YouTube ve Medya Varlıkları</h4>
-                        </div>
-                        <p className={cn("text-[10px] font-medium leading-relaxed mb-3", isDarkMode ? "text-slate-400" : "text-slate-500")}>
-                          Funzone AI logosunu YouTube kanalınızda veya diğer mecralarda kullanmak için yüksek çözünürlüklü önizlemeyi açabilirsiniz.
-                        </p>
-                        <button
-                          onClick={() => {
-                            setShowHelpGuide(false);
-                            setShowLogoPreview(true);
-                          }}
-                          className="w-full py-2 rounded-xl bg-purple-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-purple-700 transition-colors"
-                        >
-                          Logoyu Görüntüle (HD)
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className={cn(
-                    "p-5 rounded-3xl border-2 mb-6",
-                    isDarkMode ? "bg-indigo-500/5 border-indigo-500/20" : "bg-indigo-50 border-indigo-100"
-                  )}>
-                    <h3 className={cn("text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2", isDarkMode ? "text-indigo-400" : "text-indigo-600")}>
-                      <Cpu size={14} /> WİFO AI Modelleri
-                    </h3>
-                    <div className="space-y-3">
-                      {[
-                        { id: 'A1', name: 'WİFO A1', desc: 'Temel zeka seviyesi. Günlük sohbetler ve basit sorular için idealdir.', suggest: 'Hızlı yanıtlar ve genel bilgi için kullanın.' },
-                        { id: 'A1+', name: 'WİFO A1+', desc: 'Geliştirilmiş hız ve daha geniş bilgi birikimi. Daha akıcı diyaloglar.', suggest: 'Daha doğal bir sohbet deneyimi için tercih edin.' },
-                        { id: 'A1,5', name: 'WİFO A1,5', desc: 'Mantıksal çıkarım yeteneği artırılmış model. Karmaşık soruları analiz eder.', suggest: 'Problem çözme ve detaylı analizler için idealdir.' },
-                        { id: 'A1,5+', name: 'WİFO A1,5+', desc: 'Profesyonel düzeyde dil kullanımı ve üstün problem çözme yeteneği.', suggest: 'Yaratıcı yazarlık ve teknik konular için en iyisidir.' },
-                        { id: 'A2', name: 'WİFO A2 (PLUS)', desc: 'En gelişmiş model. En yüksek hız, en derin zeka ve 2K görsel desteği.', suggest: 'En üst düzey performans ve kalite için kullanın.' },
-                      ].map((model, i) => (
-                        <div key={i} className={cn(
-                          "p-3 rounded-2xl border",
-                          isDarkMode ? "bg-slate-800/50 border-slate-700" : "bg-white border-slate-100 shadow-sm"
-                        )}>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-indigo-500 text-white uppercase">{model.id}</span>
-                            <span className={cn("text-[10px] font-bold italic", isDarkMode ? "text-slate-500" : "text-slate-400")}>{model.name}</span>
-                          </div>
-                          <p className={cn("text-[11px] font-bold mb-1", isDarkMode ? "text-slate-200" : "text-slate-700")}>{model.desc}</p>
-                          <p className="text-[10px] font-medium text-indigo-500 italic">💡 Öneri: {model.suggest}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {[
-                    { title: "Sohbet Modu", desc: "Alt kısımdaki metin kutusuna yazarak WİFO ile sohbet edebilirsiniz. Sorular sorun, kod yazdırın veya sadece dertleşin.", icon: MessageSquare },
-                    { title: "Görsel Üretimi", desc: "Üst menüden 'Görsel' moduna geçerek hayalinizdeki sahneyi tarif edin. WİFO sizin için çizecektir.", icon: ImageIcon },
-                    { title: "Sesli Dinleme", desc: "Botun mesajlarının yanındaki hoparlör simgesine tıklayarak yanıtları sesli olarak dinleyebilirsiniz.", icon: Volume2 },
-                    { title: "Dil Değiştirme", desc: "Sol üstteki dünya simgesine tıklayarak WİFO'nun sizinle hangi dilde konuşacağını seçebilirsiniz.", icon: Languages },
-                    { title: "Geçmiş Sohbetler", desc: "Sol üstteki menü simgesinden eski sohbetlerinize ulaşabilir veya yeni bir sohbet başlatabilirsiniz.", icon: Zap },
-                    { title: "Karanlık/Aydınlık Mod", desc: "Sağ üstteki güneş/ay simgesiyle arayüzü göz zevkinize göre ayarlayabilirsiniz.", icon: Moon },
-                    { title: "WİFO PLUS", desc: "Kurucu girişi yaparak A2 seviyesinde zeka ve 2K görsel üretimi gibi premium özelliklere erişebilirsiniz.", icon: Sparkles },
-                  ].map((item, i) => (
-                    <motion.div 
-                      key={i}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                      className={cn(
-                        "p-4 rounded-2xl border transition-all",
-                        isDarkMode ? "bg-slate-800/50 border-slate-700" : "bg-slate-50 border-slate-100"
-                      )}
-                    >
-                      <div className="flex items-center gap-3 mb-1">
-                        <item.icon size={18} className="text-emerald-500" />
-                        <h3 className={cn("text-sm font-black", isDarkMode ? "text-white" : "text-slate-900")}>{item.title}</h3>
-                      </div>
-                      <p className={cn("text-xs font-medium leading-relaxed", isDarkMode ? "text-slate-400" : "text-slate-500")}>{item.desc}</p>
-                    </motion.div>
-                  ))}
-                </div>
-
-                <button
-                  onClick={() => setShowHelpGuide(false)}
-                  className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-500/20"
-                >
-                  Anladım, Teşekkürler!
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* WİFO A2 Modal */}
-      <AnimatePresence>
-        {showA2Modal && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowA2Modal(false)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-md"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className={cn(
-                "relative w-full max-w-lg p-8 rounded-[3rem] shadow-2xl border overflow-hidden",
-                isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
-              )}
-            >
-              <div className="absolute top-0 right-0 p-8 opacity-10">
-                <Sparkles size={120} className="text-indigo-500" />
-              </div>
-              
-              <div className="relative space-y-8">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center shadow-lg shadow-yellow-500/20">
-                    <Sparkles className="text-white w-8 h-8" />
-                  </div>
-                  <div>
-                    <h2 className={cn("text-3xl font-black italic", isDarkMode ? "text-white" : "text-slate-900")}>
-                      WİFO <span className="text-yellow-500">A2</span>
-                    </h2>
-                    <p className="text-xs font-bold text-slate-500 tracking-widest uppercase">Gelecek Nesil Yapay Zeka</p>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  {[
-                    { title: "İlk 4K Görsel Üretimi", desc: "Sektördeki ilk gerçek 4K çözünürlüklü yapay zeka görsel üretimi.", icon: ImageIcon },
-                    { title: "Daha Hızlı Cevap", desc: "A1 modeline göre %300 daha hızlı işlem ve yanıt süresi.", icon: Zap },
-                    { title: "Gelişmiş Mantık", desc: "Karmaşık problemleri çözme ve daha doğal diyalog yeteneği.", icon: Brain },
-                    { title: "Çıkış Tarihi", desc: "Geliştirme aşamasında. Henüz bir tarih belirlenmedi.", icon: Calendar },
-                  ].map((item, i) => (
-                    <div key={i} className={cn(
-                      "flex items-start gap-4 p-4 rounded-2xl border transition-all",
-                      isDarkMode ? "bg-slate-800/50 border-slate-700" : "bg-slate-50 border-slate-100"
-                    )}>
-                      <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-500">
-                        <item.icon size={20} />
-                      </div>
-                      <div>
-                        <h4 className={cn("font-bold text-sm", isDarkMode ? "text-white" : "text-slate-900")}>{item.title}</h4>
-                        <p className="text-xs text-slate-500 font-medium leading-relaxed">{item.desc}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <button
-                  onClick={() => setShowA2Modal(false)}
-                  className={cn(
-                    "w-full py-4 text-white rounded-2xl font-black transition-all active:scale-95 shadow-xl shadow-indigo-500/20",
-                    isPlusActive ? "bg-gradient-to-br " + getPlusThemeClass() : getA1ThemeClass()
-                  )}
-                >
-                  ANLADIM
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* PLUS Confirmation Modal */}
-      <AnimatePresence>
-        {showPlusConfirmation && (
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowPlusConfirmation(false)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-md"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className={cn(
-                "relative w-full max-w-sm p-8 rounded-[3rem] shadow-2xl border text-center space-y-6",
-                isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
-              )}
-            >
-              <div className={cn(
-                "w-20 h-20 rounded-full flex items-center justify-center mx-auto",
-                isDarkMode ? "bg-indigo-600/20" : "bg-indigo-50"
-              )}>
-                <Zap size={40} className={cn("animate-pulse", isPlusActive ? "text-indigo-400" : "text-indigo-600")} />
-              </div>
-              <div className="space-y-2">
-                <h2 className={cn("text-2xl font-black", isDarkMode ? "text-white" : "text-slate-900")}>Emin misin?</h2>
-                <p className={cn("text-sm font-medium", isDarkMode ? "text-slate-400" : "text-slate-500")}>
-                  WİFO PLUS moduna geçiş yapmak üzeresiniz. Bu işlem sistem kaynaklarını optimize edecektir.
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowPlusConfirmation(false)}
-                  className={cn(
-                    "flex-1 py-4 rounded-2xl font-bold transition-all active:scale-95",
-                    isDarkMode ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-600"
-                  )}
-                >
-                  Hayır
-                </button>
-                <button
-                  onClick={handleConfirmPlus}
-                  className={cn(
-                    "flex-[2] py-4 text-white rounded-2xl font-bold transition-all active:scale-95 shadow-lg shadow-indigo-500/20",
-                    isPlusActive ? "bg-gradient-to-br " + getPlusThemeClass() : getA1ThemeClass()
-                  )}
-                >
-                  Evet
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Transferring Screen */}
-      <AnimatePresence>
-        {isTransferring && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className={cn(
-              "fixed inset-0 z-[100] flex flex-col items-center justify-center text-white space-y-8 transition-all duration-500",
-              isPlusActive ? "bg-gradient-to-br " + getPlusThemeClass() : getA1ThemeClass()
-            )}
-          >
-            <motion.div
-              animate={{ 
-                scale: [1, 1.2, 1],
-                rotate: [0, 180, 360]
-              }}
-              transition={{ 
-                duration: 2,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}
-              className="w-24 h-24 rounded-[2rem] bg-white/20 backdrop-blur-xl flex items-center justify-center border border-white/30 overflow-hidden"
-            >
-              {localStorage.getItem('funzone_custom_icon') ? (
-                <img src={localStorage.getItem('funzone_custom_icon')!} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              {currentUser?.role === 'founder' ? (
+                <Crown size={13} className="text-amber-400" />
               ) : (
-                <Rocket size={48} className="text-white" />
+                <LogIn size={13} className="text-cyan-400" />
               )}
-            </motion.div>
-            <div className="text-center space-y-2">
-              <motion.h2 
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                className="text-4xl font-black italic tracking-tighter"
-              >
-                İLETİLİYORSUNUZ
-              </motion.h2>
-              <p className="text-indigo-100 font-bold tracking-widest uppercase text-xs opacity-60">Sistem Optimize Ediliyor...</p>
-            </div>
-            <div className="flex gap-2">
-              {[0, 1, 2].map((i) => (
-                <motion.div
-                  key={i}
-                  animate={{ 
-                    scale: [1, 1.5, 1],
-                    opacity: [0.3, 1, 0.3]
-                  }}
-                  transition={{ 
-                    duration: 1,
-                    repeat: Infinity,
-                    delay: i * 0.2
-                  }}
-                  className="w-2 h-2 rounded-full bg-white"
-                />
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              <span>{currentUser ? currentUser.name : 'Giriş Yap'}</span>
+            </button>
 
-      {/* Logout Confirmation Modal */}
-      <AnimatePresence>
-        {showLogoutConfirm && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowLogoutConfirm(false)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-md"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className={cn(
-                "relative w-full max-w-sm p-8 rounded-[2.5rem] shadow-2xl border overflow-hidden text-center space-y-6",
-                isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
-              )}
+            <button
+              type="button"
+              onClick={() => setShowStartScreen(true)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border font-medium transition-colors whitespace-nowrap shrink-0 ${
+                isDarkMode
+                  ? 'bg-slate-800/50 border-slate-700/80 text-slate-300 hover:text-white'
+                  : 'bg-slate-100 border-slate-200 text-slate-700 hover:text-slate-900'
+              }`}
+              title="Başla Yeri (Karşılama Ekranı)"
             >
-              <div className="w-20 h-20 rounded-3xl bg-rose-600/10 text-rose-600 flex items-center justify-center mx-auto">
-                <LogOut size={40} />
-              </div>
-              
-              <div className="space-y-2">
-                <h2 className={cn("text-2xl font-black", isDarkMode ? "text-white" : "text-slate-900")}>
-                  Çıkış Yapılsın mı?
-                </h2>
-                <p className="text-sm font-medium text-slate-500">
-                  Kurucu hesabından çıkış yapmak istediğinize emin misiniz? Tüm yetkileriniz sıfırlanacaktır.
-                </p>
-              </div>
+              <Compass size={13} className="text-cyan-400" />
+              <span>Başla Yeri</span>
+            </button>
 
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowLogoutConfirm(false)}
-                  className={cn(
-                    "flex-1 py-4 rounded-2xl font-bold transition-all active:scale-95",
-                    isDarkMode ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-600"
-                  )}
-                >
-                  İptal
-                </button>
-                <button
-                  onClick={handleFounderLogout}
-                  className="flex-[2] py-4 bg-rose-600 text-white rounded-2xl font-bold hover:bg-rose-700 transition-all active:scale-95 shadow-lg shadow-rose-500/20"
-                >
-                  Evet, Çıkış Yap
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+            <span className="hidden sm:inline text-slate-600" aria-hidden="true">·</span>
+            <span className="hidden sm:inline font-display font-bold">
+              {aiLevel === 'Q_PU_9000'
+                ? 'Q-PU 9000 Series (Kurucu)'
+                : aiLevel === 'A3_QUANTUM'
+                ? 'WİFO A3 Quantum'
+                : aiLevel === 'A2'
+                ? 'WİFO A2 (Hediye)'
+                : `WİFO ${aiLevel}`}
+            </span>
 
-      {/* Profile Modal */}
-      <AnimatePresence>
-        {showProfileModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowProfileModal(false)}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className={cn(
-                "relative w-full max-w-md p-8 rounded-[2.5rem] shadow-2xl overflow-hidden",
-                isDarkMode ? "bg-slate-900 border border-slate-800" : "bg-white"
-              )}
+            {/* Quick Mobile/Desktop Pills for Bioscience, A Series & Q-PU 9000 Series */}
+            <button
+              type="button"
+              onClick={() => setMode('bioscience')}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                mode === 'bioscience'
+                  ? 'bg-teal-500/20 border-teal-400 text-teal-300'
+                  : isDarkMode
+                  ? 'bg-teal-500/10 border-teal-500/30 text-teal-300 hover:bg-teal-500/20'
+                  : 'bg-teal-50 border-teal-200 text-teal-800'
+              }`}
             >
-              <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-br from-indigo-600 to-purple-600 -z-10" />
-              
-              <div className="flex flex-col items-center text-center space-y-6">
-                <div className="relative">
-                  <div className="w-24 h-24 rounded-3xl bg-white p-1 shadow-xl">
-                    <div className={cn(
-                      "w-full h-full rounded-2xl flex items-center justify-center",
-                      isFounder ? "bg-indigo-600" : "bg-slate-100"
-                    )}>
-                      <User size={40} className={isFounder ? "text-white" : "text-slate-400"} />
-                    </div>
-                  </div>
-                  {isFounder && (
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      className="absolute -bottom-2 -right-2 bg-yellow-400 text-indigo-950 p-1.5 rounded-xl shadow-lg"
-                    >
-                      <Zap size={16} fill="currentColor" />
-                    </motion.div>
-                  )}
-                </div>
+              <Dna size={13} className="text-teal-400" />
+              <span>Biyobilim (3B Protein & Genom)</span>
+            </button>
 
-                <div className="space-y-1">
-                  <h2 className={cn("text-2xl font-black", isDarkMode ? "text-white" : "text-slate-900")}>
-                    {isFounder ? "Kurucu Hesabı" : "Misafir Kullanıcı"}
-                  </h2>
-                  <p className={cn("text-sm font-medium", isDarkMode ? "text-slate-400" : "text-slate-500")}>
-                    {isFounder ? "WİFO Şirketi Yetkilisi" : "Funzone Deneyimi"}
-                  </p>
-                </div>
-
-                <div className="w-full max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar space-y-6">
-                  <div className="space-y-2">
-                    <h3 className={cn("text-xs font-black uppercase tracking-widest text-left", isDarkMode ? "text-slate-500" : "text-slate-400")}>
-                      Modül Açıklamaları
-                    </h3>
-                    <div className={cn(
-                      "p-4 rounded-2xl text-[10px] font-bold leading-relaxed space-y-1 text-left",
-                      isDarkMode ? "bg-slate-800/50 text-slate-400" : "bg-slate-50 text-slate-500"
-                    )}>
-                      <p>• <span className={isDarkMode ? "text-white" : "text-slate-900"}>WİFO A1:</span> Standart yapay zeka deneyimi.</p>
-                      <p>• <span className={isDarkMode ? "text-white" : "text-slate-900"}>WİFO A1+:</span> Daha hızlı ve akıcı yanıtlar.</p>
-                      <p>• <span className={isDarkMode ? "text-white" : "text-slate-900"}>WİFO A1,5:</span> Gelişmiş mantık ve derinlikli analiz.</p>
-                      <p>• <span className={isDarkMode ? "text-white" : "text-slate-900"}>WİFO A1,5+:</span> Profesyonel seviye zeka ve hız.</p>
-                      <p>• <span className={isDarkMode ? "text-white" : "text-slate-900"}>WİFO A2:</span> En üst düzey zeka ve performans.</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h3 className={cn("text-xs font-black uppercase tracking-widest text-left", isDarkMode ? "text-slate-500" : "text-slate-400")}>
-                      Sponsorlar
-                    </h3>
-                    <div className={cn(
-                      "p-4 rounded-2xl border-2 grid grid-cols-2 gap-3",
-                      isDarkMode ? "bg-slate-800/50 border-slate-700" : "bg-slate-50 border-slate-100"
-                    )}>
-                      {[
-                        "WİFO", "FE", "MUZ FC", "FUNZONE AI", "Sequel Studio"
-                      ].map((sponsor, i) => (
-                        <div key={i} className="flex items-center gap-2">
-                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                          <span className={cn("text-[10px] font-black uppercase tracking-tighter", isDarkMode ? "text-slate-300" : "text-slate-600")}>
-                            {sponsor}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h3 className={cn("text-xs font-black uppercase tracking-widest text-left", isDarkMode ? "text-slate-500" : "text-slate-400")}>
-                      Tema Seçimi
-                    </h3>
-                    <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
-                      {[
-                        { id: 'indigo', label: 'Klasik', color: 'bg-indigo-600' },
-                        { id: 'emerald', label: 'Zümrüt', color: 'bg-emerald-600' },
-                        { id: 'rose', label: 'Gül', color: 'bg-rose-600' },
-                        { id: 'amber', label: 'Kehribar', color: 'bg-amber-600' },
-                        { id: 'slate', label: 'Gece', color: 'bg-slate-800' },
-                      ].map((t) => (
-                        <button
-                          key={t.id}
-                          onClick={() => setA1Theme(t.id)}
-                          className={cn(
-                            "flex-shrink-0 px-4 py-2 rounded-xl border-2 transition-all flex items-center gap-2",
-                            a1Theme === t.id 
-                              ? "border-indigo-600 bg-indigo-600/5 shadow-md" 
-                              : (isDarkMode ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-100")
-                          )}
-                        >
-                          <div className={cn("w-3 h-3 rounded-full", t.color)} />
-                          <span className={cn("text-[10px] font-black", a1Theme === t.id ? "text-indigo-600" : (isDarkMode ? "text-white" : "text-slate-900"))}>
-                            {t.label}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h3 className={cn("text-xs font-black uppercase tracking-widest text-left", isDarkMode ? "text-slate-500" : "text-slate-400")}>
-                      Güvenlik & Kontrol
-                    </h3>
-                    <div className="space-y-2">
-                      <button
-                        onClick={() => setShowFaceScan(true)}
-                        className={cn(
-                          "w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between group",
-                          isDarkMode ? "bg-slate-800/50 border-slate-700 hover:border-indigo-500" : "bg-slate-50 border-slate-100 hover:border-indigo-600"
-                        )}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <Camera size={20} />
-                          </div>
-                          <div className="text-left">
-                            <h3 className={cn("text-sm font-black", isDarkMode ? "text-white" : "text-slate-900")}>Yüz Tarama</h3>
-                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
-                              {userAge ? `Yaşınız: ${userAge}` : "Yaş Tespiti Yap"}
-                            </p>
-                          </div>
-                        </div>
-                        <Zap size={16} className="text-slate-400 group-hover:text-indigo-500 transition-colors" />
-                      </button>
-
-                      <div className={cn(
-                        "w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between",
-                        isParentalControlActive 
-                          ? "bg-emerald-600/10 border-emerald-500 shadow-lg shadow-emerald-500/10" 
-                          : (isDarkMode ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-100")
-                      )}>
-                        <div className="flex items-center gap-3">
-                          <div className={cn(
-                            "w-10 h-10 rounded-xl flex items-center justify-center",
-                            isParentalControlActive ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-500"
-                          )}>
-                            <Eye size={20} />
-                          </div>
-                          <div className="text-left">
-                            <h3 className={cn("text-sm font-black", isDarkMode ? "text-white" : "text-slate-900")}>Ebeveyn Kontrolü</h3>
-                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Dede Dostu Güvenlik</p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => setShowParentalSettings(true)}
-                          className={cn(
-                            "px-4 py-2 rounded-xl text-xs font-black transition-all active:scale-95",
-                            isParentalControlActive ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-600"
-                          )}
-                        >
-                          {isParentalControlActive ? "AYARLAR" : "AÇ"}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h3 className={cn("text-xs font-black uppercase tracking-widest text-left", isDarkMode ? "text-slate-500" : "text-slate-400")}>
-                      Yapay Zeka Modülü
-                    </h3>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { id: 'A1', label: 'WİFO A1', desc: 'Standart', free: true },
-                        { id: 'A1+', label: 'WİFO A1+', desc: 'Hızlı', free: true },
-                        { id: 'A1,5', label: 'WİFO A1,5', desc: 'Zeki', free: false },
-                        { id: 'A1,5+', label: 'WİFO A1,5+', desc: 'Pro', free: false },
-                        { id: 'A2', label: 'WİFO A2', desc: 'Efsane', free: false },
-                      ].map((model) => (
-                        <button
-                          key={model.id}
-                          disabled={!model.free && !isFounder}
-                          onClick={() => {
-                            setAiLevel(model.id as AILevel);
-                            if (model.id === 'A2') {
-                              setIsPlusActive(true);
-                              localStorage.setItem('funzone_plus_active', 'true');
-                            } else {
-                              setIsPlusActive(false);
-                              localStorage.setItem('funzone_plus_active', 'false');
-                            }
-                          }}
-                          className={cn(
-                            "p-3 rounded-2xl border-2 transition-all text-left relative overflow-hidden",
-                            aiLevel === model.id 
-                              ? "border-indigo-600 bg-indigo-600/5 shadow-md" 
-                              : (isDarkMode ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-100"),
-                            (!model.free && !isFounder) && "opacity-50 grayscale cursor-not-allowed"
-                          )}
-                        >
-                          <div className="flex flex-col">
-                            <span className={cn("text-sm font-black", aiLevel === model.id ? "text-indigo-600" : (isDarkMode ? "text-white" : "text-slate-900"))}>
-                              {model.label}
-                            </span>
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">{model.desc}</span>
-                          </div>
-                          {aiLevel === model.id && (
-                            <div className="absolute top-1 right-1">
-                              <Check size={12} className="text-indigo-600" />
-                            </div>
-                          )}
-                          {!model.free && !isFounder && (
-                            <div className="absolute top-1 right-1">
-                              <Lock size={12} className="text-slate-400" />
-                            </div>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h3 className={cn("text-xs font-black uppercase tracking-widest text-left", isDarkMode ? "text-slate-500" : "text-slate-400")}>
-                      Sponsorlar
-                    </h3>
-                    <div className={cn(
-                      "p-4 rounded-2xl border-2 grid grid-cols-2 gap-3",
-                      isDarkMode ? "bg-slate-800/50 border-slate-700" : "bg-slate-50 border-slate-100"
-                    )}>
-                      {[
-                        "WİFO", "FE", "MUZ FC", "FUNZONE AI", "Sequel Studio"
-                      ].map((sponsor, i) => (
-                        <div key={i} className="flex items-center gap-2">
-                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                          <span className={cn("text-[10px] font-black uppercase tracking-tighter", isDarkMode ? "text-slate-300" : "text-slate-600")}>
-                            {sponsor}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h3 className={cn("text-xs font-black uppercase tracking-widest text-left", isDarkMode ? "text-slate-500" : "text-slate-400")}>
-                      Destek & Şikayet
-                    </h3>
-                    <a 
-                      href="https://feyardimmerkezi.netlify.app" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className={cn(
-                        "w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between group",
-                        isDarkMode ? "bg-slate-800/50 border-slate-700 hover:border-indigo-500" : "bg-slate-50 border-slate-100 hover:border-indigo-600"
-                      )}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <AlertCircle size={20} />
-                        </div>
-                        <div className="text-left">
-                          <h3 className={cn("text-sm font-black", isDarkMode ? "text-white" : "text-slate-900")}>Sıkıntı veya Şikayet</h3>
-                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">FE Yardım Merkezi</p>
-                        </div>
-                      </div>
-                      <ExternalLink size={16} className="text-slate-400 group-hover:text-indigo-500 transition-colors" />
-                    </a>
-                  </div>
-
-                  <div className="w-full space-y-3 pt-2">
-                    {isFounder && (
-                      <div className={cn(
-                        "w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between",
-                        isPlusActive 
-                          ? "bg-indigo-600/10 border-indigo-500 shadow-lg shadow-indigo-500/10" 
-                          : (isDarkMode ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-100")
-                      )}>
-                        <div className="flex items-center gap-3">
-                          <div className={cn(
-                            "w-10 h-10 rounded-xl flex items-center justify-center",
-                            isPlusActive ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-500"
-                          )}>
-                            <Sparkles size={20} />
-                          </div>
-                          <div className="text-left">
-                            <h3 className={cn("text-sm font-black", isDarkMode ? "text-white" : "text-slate-900")}>WİFO PLUS</h3>
-                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">A2 Seviyesinde Deneyim</p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={togglePlus}
-                          className={cn(
-                            "px-4 py-2 rounded-xl text-xs font-black transition-all active:scale-95",
-                            isPlusActive ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-600"
-                          )}
-                        >
-                          {isPlusActive ? "AKTİF" : "ETKİNLEŞTİR"}
-                        </button>
-                      </div>
-                    )}
-
-                    {isFounder && (
-                      <button
-                        onClick={async () => {
-                          setIsLoading(true);
-                          try {
-                            const freshAi = getAiInstance();
-                            const response = await freshAi.models.generateContent({
-                              model: 'gemini-2.5-flash-image',
-                              contents: {
-                                parts: [{ text: 'A futuristic, sleek, and vibrant AI app icon for "Funzone". High-tech aesthetic, 3D glassmorphism, indigo and purple gradients, centered friendly robot eye or stylized "F", 4k resolution, professional logo design.' }]
-                              },
-                              config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }
-                            });
-                            for (const part of response.candidates[0].content.parts) {
-                              if (part.inlineData) {
-                                localStorage.setItem('funzone_custom_icon', `data:image/png;base64,${part.inlineData.data}`);
-                                window.location.reload();
-                              }
-                            }
-                          } catch (err) {
-                            console.error("Icon generation failed:", err);
-                          } finally {
-                            setIsLoading(false);
-                          }
-                        }}
-                        disabled={isLoading}
-                        className="w-full py-4 bg-emerald-600/10 text-emerald-600 rounded-2xl font-bold hover:bg-emerald-600/20 transition-all active:scale-95 flex items-center justify-center gap-2"
-                      >
-                        <ImageIcon size={20} /> {isLoading ? "Üretiliyor..." : "Özel Uygulama İkonu Üret"}
-                      </button>
-                    )}
-
-                    {isFounder && localStorage.getItem('funzone_custom_icon') && (
-                      <button
-                        onClick={() => {
-                          localStorage.removeItem('funzone_custom_icon');
-                          window.location.reload();
-                        }}
-                        className="w-full py-4 bg-slate-600/10 text-slate-600 rounded-2xl font-bold hover:bg-slate-600/20 transition-all active:scale-95 flex items-center justify-center gap-2"
-                      >
-                        <Trash2 size={20} /> İkonu Sıfırla
-                      </button>
-                    )}
-
-                    {isFounder && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowLogoutConfirm(true);
-                        }}
-                        className="w-full py-4 bg-rose-600/10 text-rose-600 rounded-2xl font-bold hover:bg-rose-600/20 transition-all active:scale-95 flex items-center justify-center gap-2 relative z-50"
-                      >
-                        <LogOut size={20} /> Kurucu Çıkışı
-                      </button>
-                    )}
-
-                    {!isFounder && !showFounderLogin && (
-                      <button
-                        onClick={() => setShowFounderLogin(true)}
-                        className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all active:scale-95 flex items-center justify-center gap-2"
-                      >
-                        <Shield size={20} /> Kurucu Giriş
-                      </button>
-                    )}
-
-                    {showFounderLogin && (
-                      <div className="space-y-3">
-                        <div className="relative">
-                          <input
-                            type="password"
-                            placeholder="Kurucu Şifresi"
-                            value={founderPasswordInput}
-                            onChange={(e) => {
-                              setFounderPasswordInput(e.target.value);
-                              setLoginError(false);
-                            }}
-                            onKeyDown={(e) => e.key === 'Enter' && handleFounderLogin()}
-                            className={cn(
-                              "w-full px-5 py-4 rounded-2xl border-2 outline-none transition-all",
-                              loginError 
-                                ? "border-rose-500 bg-rose-50" 
-                                : (isDarkMode 
-                                    ? "bg-slate-800 border-slate-700 text-white focus:border-indigo-500" 
-                                    : "bg-slate-50 border-slate-100 text-slate-900 focus:border-indigo-600")
-                            )}
-                            autoFocus
-                          />
-                          {loginError && (
-                            <motion.p 
-                              initial={{ opacity: 0, y: -10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className="text-[10px] font-bold text-rose-600 mt-1 ml-2 uppercase tracking-tighter"
-                            >
-                              Hatalı Şifre! Lütfen tekrar deneyin.
-                            </motion.p>
-                          )}
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setShowFounderLogin(false)}
-                            className={cn(
-                              "flex-1 py-4 rounded-2xl font-bold transition-all active:scale-95",
-                              isDarkMode ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-600"
-                            )}
-                          >
-                            İptal
-                          </button>
-                          <button
-                            onClick={handleFounderLogin}
-                            className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all active:scale-95"
-                          >
-                            Giriş Yap
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="w-full pt-4">
-                  <button
-                    onClick={() => setShowProfileModal(false)}
-                    className={cn(
-                      "w-full py-4 rounded-2xl font-bold transition-all active:scale-95",
-                      isDarkMode ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-600"
-                    )}
-                  >
-                    Kapat
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Logo Preview Modal for YouTube */}
-      <AnimatePresence>
-        {showLogoPreview && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowLogoPreview(false)}
-              className="absolute inset-0 bg-black/95 backdrop-blur-3xl"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="relative w-full max-w-2xl aspect-square bg-slate-900 rounded-[4rem] border border-white/10 flex flex-col items-center justify-center p-12 overflow-hidden"
+            <button
+              type="button"
+              onClick={() => setMode('a_series')}
+              className={`px-2.5 py-1.5 rounded-xl border font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                mode === 'a_series'
+                  ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300'
+                  : isDarkMode
+                  ? 'bg-slate-800/60 border-slate-700 text-slate-300 hover:text-white'
+                  : 'bg-slate-100 border-slate-200 text-slate-700'
+              }`}
             >
-              {/* Background Glows */}
-              <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-                <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] bg-blue-500/20 rounded-full blur-[120px]" />
-                <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] bg-emerald-500/20 rounded-full blur-[120px]" />
-              </div>
+              A Series Güç Farkı
+            </button>
 
-              <div className="relative z-10 flex flex-col items-center space-y-12">
-                <div className="p-8 bg-white/5 rounded-[3rem] border border-white/10 shadow-2xl">
-                  <Logo className="w-64 h-64" />
-                </div>
-                
-                <div className="text-center space-y-4">
-                  <h2 className="text-5xl font-black text-white tracking-tighter italic">
-                    FUN<span className="text-indigo-500">ZONE</span> AI
-                  </h2>
-                  <p className="text-slate-400 font-bold uppercase tracking-[0.3em] text-sm">
-                    YouTube Asset Preview (HD)
-                  </p>
-                </div>
-
-                <div className="flex gap-4">
-                  <button
-                    onClick={() => setShowLogoPreview(false)}
-                    className="px-8 py-4 rounded-2xl bg-white text-black font-black uppercase tracking-widest text-xs hover:bg-slate-200 transition-all"
-                  >
-                    Kapat
-                  </button>
-                  <p className="text-slate-500 text-[10px] font-bold max-w-[200px] text-center">
-                    Ekran görüntüsü alarak YouTube profil resmi veya banner olarak kullanabilirsiniz.
-                  </p>
-                </div>
-              </div>
-            </motion.div>
+            <button
+              type="button"
+              onClick={() => setMode('qpu_9000')}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                mode === 'qpu_9000'
+                  ? 'bg-amber-500/25 border-amber-400 text-amber-200'
+                  : 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
+              }`}
+            >
+              <Crown size={12} className="text-amber-400" />
+              <span>Q-PU 9000 Series (İncele)</span>
+            </button>
           </div>
-        )}
-      </AnimatePresence>
 
-      {/* Chat Area */}
-      <main className="flex-1 overflow-y-auto px-4 py-8 md:px-0">
-        <div className="max-w-3xl mx-auto space-y-8">
-          {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-6">
-              <motion.div 
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className={cn(
-                  "w-20 h-20 rounded-3xl flex items-center justify-center shadow-2xl transition-all duration-500",
-                  isPlusActive 
-                    ? "bg-gradient-to-br " + getPlusThemeClass() + " text-white shadow-indigo-500/20"
-                    : (isDarkMode ? "bg-indigo-900/30 text-indigo-400 shadow-indigo-500/10" : "bg-indigo-50 text-indigo-600 shadow-indigo-500/5")
-                )}
-              >
-                {mode === 'chat' ? <MessageSquare className="w-10 h-10" /> : 
-                 mode === 'image' ? <ImageIcon className="w-10 h-10" /> :
-                 <FileUp className="w-10 h-10" />}
-              </motion.div>
-              <div className="space-y-2">
-                <h2 className={cn(
-                  "text-3xl font-black tracking-tighter flex items-center gap-2",
-                  isDarkMode ? "text-white" : "text-slate-900"
-                )}>
-                  {mode === 'chat' ? 'Nelerden bahsedelim?' : 
-                   mode === 'image' ? 'Ne çizelim?' : 
-                   'Dosya Yükleme Modu'}
-                  {isPlusActive && (
-                    <span className="bg-indigo-600 text-white text-[10px] px-2 py-0.5 rounded-full shadow-lg animate-pulse">PLUS</span>
-                  )}
-                </h2>
-                <p className={cn(
-                  "text-lg font-medium max-w-sm mx-auto",
-                  isDarkMode ? "text-slate-400" : "text-slate-500"
-                )}>
-                  {mode === 'chat' ? 'Funzone ile her konuda sohbet edebilirsin.' : 
-                   mode === 'image' ? 'Hayalindeki görseli tarif et, Funzone çizsin.' :
-                   'Analiz edilmesi için dosya yükleyin veya sürükleyin.'}
-                </p>
-              </div>
+          {/* Right: Voice Changer Studio, Auto-Speak, Notifications, Telemetry & Theme */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Voice Changer Trigger Button */}
+            <button
+              type="button"
+              onClick={() => setIsVoiceModalOpen(true)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors whitespace-nowrap shrink-0 ${
+                isDarkMode
+                  ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/25'
+                  : 'bg-cyan-50 border-cyan-300 text-cyan-800 hover:bg-cyan-100'
+              }`}
+              title="Ses Değiştirme Sistemi (Ses Karakteri, Kalınlık & Hız)"
+            >
+              <AudioWaveform size={14} />
+              <span>Ses: {activeVoicePreset.name.split('·')[0].trim()}</span>
+              <span className="font-mono tabular-nums text-[11px] opacity-80">
+                ({voiceSettings.pitch.toFixed(2)}x)
+              </span>
+            </button>
 
-              {mode === 'upload' && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={cn(
-                    "w-full max-w-md p-10 rounded-[2.5rem] border-4 border-dashed transition-all cursor-pointer hover:scale-[1.02] active:scale-95",
-                    isDarkMode ? "bg-slate-900/50 border-slate-800 hover:border-indigo-500/50" : "bg-slate-50 border-slate-200 hover:border-indigo-500"
-                  )}
-                >
-                  <div className="flex flex-col items-center space-y-4">
-                    <div className="w-16 h-16 rounded-2xl bg-indigo-600/10 text-indigo-600 flex items-center justify-center">
-                      <FileUp size={32} />
-                    </div>
-                    <div className="space-y-1">
-                      <p className={cn("text-sm font-black", isDarkMode ? "text-white" : "text-slate-900")}>Dosya Seçin</p>
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-tighter">PDF, DOCX, TXT veya Görsel</p>
-                    </div>
-                  </div>
-                </motion.div>
+            {/* Auto-Speak Response Toggle */}
+            <button
+              type="button"
+              onClick={() => {
+                const next = !voiceSettings.autoSpeak;
+                setVoiceSettings({ ...voiceSettings, autoSpeak: next });
+                if (!next) stopSpeaking();
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors whitespace-nowrap shrink-0 ${
+                voiceSettings.autoSpeak
+                  ? isDarkMode
+                    ? 'bg-blue-500/15 border-blue-500/40 text-blue-300'
+                    : 'bg-blue-50 border-blue-300 text-blue-700'
+                  : isDarkMode
+                  ? 'bg-slate-800/60 border-slate-700 text-slate-400'
+                  : 'bg-slate-100 border-slate-200 text-slate-600'
+              }`}
+              title="Gelen yanıtları otomatik seslendir"
+            >
+              {voiceSettings.autoSpeak ? <Volume2 size={14} /> : <VolumeX size={14} />}
+              <span className="hidden md:inline">
+                Otomatik Ses: {voiceSettings.autoSpeak ? 'Açık' : 'Kapalı'}
+              </span>
+            </button>
+
+            {/* Toggle Quantum Energy Flow Bar (Qubit Energy Visualizer) */}
+            <button
+              type="button"
+              onClick={() => setShowEnergyFlowBar((prev) => !prev)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                showEnergyFlowBar
+                  ? isDarkMode
+                    ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                    : 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                  : isDarkMode
+                  ? 'bg-slate-800/60 border-slate-700 text-slate-400 hover:text-white'
+                  : 'bg-slate-100 border-slate-200 text-slate-600'
+              }`}
+              title="Mesajların altındaki Qubit Kuantum Enerji Çubuğunu Aç / Kapat"
+            >
+              <Zap size={13} className={showEnergyFlowBar ? 'text-emerald-400' : 'text-slate-500'} />
+              <span>Enerji Çubuğu: {showEnergyFlowBar ? 'Açık' : 'Kapalı'}</span>
+            </button>
+
+            {/* Toggle Quantum Telemetry HUD */}
+            <button
+              type="button"
+              onClick={() => setShowProcessorPanel(!showProcessorPanel)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors whitespace-nowrap shrink-0 ${
+                showProcessorPanel
+                  ? isDarkMode
+                    ? 'bg-violet-500/15 border-violet-500/40 text-violet-300'
+                    : 'bg-violet-50 border-violet-300 text-violet-700'
+                  : isDarkMode
+                  ? 'bg-slate-800/60 border-slate-700 text-slate-300 hover:text-white'
+                  : 'bg-slate-100 border-slate-200 text-slate-700'
+              }`}
+            >
+              <Sliders size={13} />
+              <span className="hidden sm:inline">Telemetri</span>
+            </button>
+
+            {/* Notification Settings Quick Access */}
+            <button
+              type="button"
+              onClick={() => setIsNotificationModalOpen(true)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors whitespace-nowrap shrink-0 ${
+                isDarkMode
+                  ? 'bg-slate-800/60 border-slate-700 text-slate-300 hover:text-white'
+                  : 'bg-slate-100 border-slate-200 text-slate-700 hover:text-slate-900'
+              }`}
+              title="Bildirim Ayarları"
+            >
+              <Bell size={13} className={notificationPrefs.enabled ? 'text-cyan-400' : 'text-slate-500'} />
+              <span className="hidden sm:inline">Bildirimler</span>
+              {unreadNotificationCount > 0 && (
+                <span className="font-mono tabular-nums text-[11px] text-cyan-400">
+                  ({unreadNotificationCount})
+                </span>
               )}
+            </button>
 
-              {mode === 'chat' && (
-                <div className="grid grid-cols-2 gap-3 w-full max-w-md">
-                  {[
-                    { title: "Şiir Yaz", icon: Heart },
-                    { title: "Kod Yaz", icon: Cpu },
-                    { title: "Plan Yap", icon: Calendar },
-                    { title: "Hikaye Anlat", icon: MessageSquare },
-                  ].map((action, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setInput(action.title + "...")}
-                      className={cn(
-                        "p-4 rounded-2xl border transition-all flex items-center gap-3 hover:scale-105 active:scale-95",
-                        isDarkMode ? "bg-slate-900 border-slate-800 text-slate-400 hover:text-white" : "bg-white border-slate-100 text-slate-500 hover:text-indigo-600 shadow-sm"
-                      )}
-                    >
-                      <action.icon size={16} />
-                      <span className="text-xs font-black">{action.title}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            <AnimatePresence mode="popLayout">
-              {messages.map((message) => (
-                <motion.div
-                  key={message.id}
-                  initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.98 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                  className={cn(
-                    "flex gap-4 group",
-                    message.role === 'user' ? "flex-row-reverse" : "flex-row"
-                  )}
-                >
-                  <motion.div 
-                    whileHover={{ scale: 1.1 }}
-                    className={cn(
-                      "w-9 h-9 rounded-lg flex items-center justify-center shrink-0 shadow-sm transition-colors",
-                      message.role === 'user' 
-                        ? (isDarkMode ? "bg-slate-800 text-white" : "bg-slate-900 text-white") 
-                        : "bg-indigo-600 text-white"
-                    )}
-                  >
-                    {message.role === 'user' ? <User size={18} /> : <Bot size={18} />}
-                  </motion.div>
-                  <div className={cn(
-                    "flex flex-col max-w-[85%] space-y-1.5",
-                    message.role === 'user' ? "items-end" : "items-start"
-                  )}>
-                    <motion.div 
-                      whileHover={{ scale: 1.005, y: -1 }}
-                      className={cn(
-                        "px-5 py-3.5 rounded-[1.8rem] shadow-sm relative group/msg transition-all duration-500 ease-out",
-                        message.role === 'user' 
-                          ? (isDarkMode ? "bg-slate-800 text-slate-100 rounded-tr-none shadow-indigo-500/5" : "bg-slate-900 text-white rounded-tr-none shadow-slate-400/10") 
-                          : (isDarkMode ? "bg-slate-900 border border-slate-800 text-slate-100 rounded-tl-none shadow-black/20" : "bg-white border border-slate-100 text-slate-800 rounded-tl-none shadow-slate-200/50")
-                      )}
-                    >
-                      {message.role === 'assistant' && (
-                        <div className="absolute -top-3 -left-3 flex items-center gap-1 z-10">
-                          <div className="bg-indigo-600 text-white text-[8px] font-black px-2 py-0.5 rounded-lg shadow-lg flex items-center gap-1">
-                            {message.botName || 'Funzone AI'}
-                          </div>
-                          {isPlusActive && (
-                            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[8px] font-black px-2 py-0.5 rounded-lg shadow-lg animate-pulse">
-                              PLUS
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      {message.role === 'assistant' && isFounder && (
-                        <div className="absolute -top-3 -right-3 bg-yellow-400 text-indigo-950 text-[8px] font-black px-2 py-0.5 rounded-lg shadow-lg z-10 animate-bounce">
-                          KURUCU YETKİSİ
-                        </div>
-                      )}
-                      {message.type === 'text' && (
-                        <div className={cn(
-                          "markdown-body prose-sm",
-                          isDarkMode ? "prose-invert" : ""
-                        )}>
-                          <Markdown>{message.content}</Markdown>
-                        </div>
-                      )}
-                      {message.type === 'image' && message.mediaUrl && (
-                        <div className="space-y-3">
-                          <p className={cn(
-                            "text-sm font-medium italic",
-                            isDarkMode ? "text-slate-400" : "text-slate-600"
-                          )}>"{message.content}"</p>
-                          <img 
-                            src={message.mediaUrl} 
-                            alt="Generated" 
-                            className={cn(
-                              "rounded-xl w-full h-auto shadow-lg border",
-                              isDarkMode ? "border-slate-800" : "border-slate-100"
-                            )}
-                            referrerPolicy="no-referrer"
-                          />
-                          <a 
-                            href={message.mediaUrl} 
-                            download="funzone-image.png"
-                            className={cn(
-                              "flex items-center justify-center gap-2 w-full py-2 rounded-lg text-xs font-bold transition-all duration-200",
-                              isDarkMode ? "bg-slate-800 hover:bg-slate-700 text-slate-300" : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                            )}
-                          >
-                            <Download size={14} /> İndir
-                          </a>
-                        </div>
-                      )}
+            {/* Theme Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              className={`p-2 rounded-xl border transition-colors shrink-0 ${
+                isDarkMode
+                  ? 'bg-slate-800/60 border-slate-700 text-slate-300 hover:text-white'
+                  : 'bg-slate-100 border-slate-200 text-slate-700 hover:text-slate-900'
+              }`}
+              title="Temayı Değiştir"
+            >
+              {isDarkMode ? <Sun size={14} className="text-amber-400" /> : <Moon size={14} className="text-slate-700" />}
+            </button>
+          </div>
+        </div>
 
-                      {message.role === 'assistant' && (
-                        <div className="absolute -right-12 top-0 flex flex-col gap-1 opacity-0 group-hover/msg:opacity-100 transition-all duration-200">
-                          <button
-                            onClick={() => copyToClipboard(message.content, message.id)}
-                            className={cn(
-                              "p-1.5 rounded-lg shadow-sm border transition-colors",
-                              isDarkMode ? "bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200" : "bg-white border-slate-100 text-slate-400 hover:text-slate-600"
-                            )}
-                            title="Kopyala"
-                          >
-                            {copiedId === message.id ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                          </button>
-                          {message.type === 'text' && (
-                            <button
-                              onClick={() => speakText(message.content, message.id)}
-                              className={cn(
-                                "p-1.5 rounded-lg shadow-sm border transition-colors",
-                                isSpeaking === message.id 
-                                  ? (isDarkMode ? "bg-indigo-900/50 text-indigo-400 border-indigo-500/30" : "bg-indigo-50 text-indigo-600 border-indigo-200") 
-                                  : (isDarkMode ? "bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200" : "bg-white border-slate-100 text-slate-400 hover:text-slate-600")
-                              )}
-                              title="Seslendir"
-                            >
-                              <Volume2 size={14} className={isSpeaking === message.id ? "animate-pulse" : ""} />
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </motion.div>
-                    <span className="text-[10px] font-medium text-slate-400 px-1">
-                      {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
+        {/* Collapsible Quantum Processor Telemetry HUD */}
+        <AnimatePresence>
+          {showProcessorPanel && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.16 }}
+            >
+              <QuantumProcessorHUD
+                isDarkMode={isDarkMode}
+                isUnlocked={isA3Unlocked}
+                onOpenGiftModal={() => setIsGiftModalOpen(true)}
+                onSelectA3Quantum={() => {
+                  if (!isA3Unlocked) {
+                    setIsGiftModalOpen(true);
+                  } else {
+                    handleSelectModel('A3_QUANTUM');
+                    setMode('chat');
+                  }
+                }}
+                telemetry={messages[messages.length - 1]?.quantumTelemetry}
+              />
+            </motion.div>
           )}
-          {isLoading && (
-            <motion.div 
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="flex gap-4"
+        </AnimatePresence>
+
+        {/* Dynamic Mode Viewports */}
+        {mode === 'bioscience' ? (
+          <BioscienceWorkbench
+            isDarkMode={isDarkMode}
+            onAskQuantumAssistant={(promptText, sessionTitle) => {
+              setActiveSessionTitle(sessionTitle);
+              setMode('chat');
+              submitPrompt(promptText);
+            }}
+          />
+        ) : mode === 'a_series' ? (
+          <ASeriesComparisonView
+            isDarkMode={isDarkMode}
+            isA3Unlocked={isA3Unlocked}
+            isFounder={currentUser?.role === 'founder'}
+            onSelectModelAndChat={(lvl) => {
+              handleSelectModel(lvl);
+              setMode('chat');
+            }}
+            onOpenGiftModal={() => setIsGiftModalOpen(true)}
+            onOpenQpu9000Tab={() => setMode('qpu_9000')}
+            onOpenFounderLogin={() => setIsAuthModalOpen(true)}
+          />
+        ) : mode === 'qpu_9000' ? (
+          <div className="rounded-3xl overflow-hidden border border-amber-500/30 min-h-[640px] flex flex-col shadow-2xl">
+            <QPU9000Showcase
+              isFounder={currentUser?.role === 'founder'}
+              onUnlockAsFounder={handleInstantFounderUnlock}
+              onSelectQpuProcessor={() => {
+                setAiLevel('Q_PU_9000');
+              }}
+              onFinishToStartScreen={() => {
+                setMode('chat');
+                setShowStartScreen(true);
+              }}
+            />
+          </div>
+        ) : mode === 'image' ? (
+          <QuantumImageStudio isDarkMode={isDarkMode} onBackToChat={() => setMode('chat')} />
+        ) : mode === 'processor' ? (
+          <div className="space-y-6">
+            <QuantumProcessorHUD
+              isDarkMode={isDarkMode}
+              isUnlocked={isA3Unlocked}
+              onOpenGiftModal={() => setIsGiftModalOpen(true)}
+              onSelectA3Quantum={() => {
+                if (!isA3Unlocked) {
+                  setIsGiftModalOpen(true);
+                } else {
+                  handleSelectModel('A3_QUANTUM');
+                  setMode('chat');
+                }
+              }}
+              telemetry={messages[messages.length - 1]?.quantumTelemetry}
+            />
+
+            <div
+              className={`p-6 sm:p-8 rounded-2xl border ${
+                isDarkMode ? 'bg-[#111622] border-slate-800/80' : 'bg-white border-slate-200'
+              }`}
             >
-              <div className="w-9 h-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-                <Bot size={18} />
+              <div className="flex items-center gap-3 mb-3">
+                <BrandLogo size={26} />
+                <h2 className="font-display text-xl font-bold">
+                  WİFO Q-PU 9000 Kuantum İşlemci & Hediye A2 Mimarisi
+                </h2>
               </div>
-              <div className={cn(
-                "px-4 py-3 rounded-2xl rounded-tl-none shadow-sm flex flex-col gap-2 border transition-all duration-300",
-                isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
-              )}>
-                <div className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 text-indigo-500 animate-spin" />
-                  <span className={cn(
-                    "text-sm font-bold",
-                    isDarkMode ? "text-slate-400" : "text-slate-500"
-                  )}>
-                    {mode === 'chat' ? 'Düşünüyor...' : mode === 'image' ? 'Çiziyor...' : 'Dosya Yükleniyor...'}
+              <p className="text-sm text-slate-400 leading-relaxed max-w-3xl mb-6">
+                Yeni nesil WİFO A3 QUANTUM modeli, klasik yapay zeka tensörlerinden farklı olarak 1024 Qubitlik
+                süperpozisyon tabanlı kuantum simülasyon çekirdekleri üzerinde çalışır ve 10 kişilik hediye koduyla
+                WİFO A2 modelini ücretsiz olarak armağan eder.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-[#161F30] border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                  <h4 className="font-display font-bold text-sm">01. Paralel Kuantum Çıkarım</h4>
+                  <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                    1024 süperpozisyon dalgası aynı anda değerlendirilir, ileri seviye yazılım mimarisi ve matematiksel
+                    analiz hızı maksimuma çıkarılır.
+                  </p>
+                </div>
+                <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-[#161F30] border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                  <h4 className="font-display font-bold text-sm">02. Hediye WİFO A2 Entegrasyonu</h4>
+                  <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                    A3 Quantum aktivasyonu, doğrudan bağımsız WİFO A2 VIP zeka kanalını kullanıcıya ücretsiz hediye
+                    olarak tanımlar.
+                  </p>
+                </div>
+                <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-[#161F30] border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                  <h4 className="font-display font-bold text-sm">03. 6 Karakterli Ses Değiştirme Stüdyosu</h4>
+                  <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                    Elif, Barbaros, Q-PU 9000 Sibernetik, Nova, Bilge ve Özel Frekans modlarıyla yanıtları istediğiniz
+                    ses kalınlığı ve hızda dinleyin.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col gap-5">
+            {/* Clean Model Selector Grid */}
+            <ModelSelector
+              currentLevel={aiLevel}
+              onSelect={handleSelectModel}
+              isDarkMode={isDarkMode}
+              isA3Unlocked={isA3Unlocked}
+              isFounder={currentUser?.role === 'founder'}
+              onOpenGiftModal={() => setIsGiftModalOpen(true)}
+              onOpenFounderLogin={() => setIsAuthModalOpen(true)}
+              onOpenQpuShowcase={() => setMode('qpu_9000')}
+            />
+
+            {/* Conversational Canvas */}
+            <div
+              className={`flex-1 flex flex-col rounded-2xl border overflow-hidden ${
+                isDarkMode ? 'bg-[#111622] border-slate-800/80' : 'bg-white border-slate-200'
+              }`}
+            >
+              {/* Subtle Canvas Subheader */}
+              <div
+                className={`px-5 py-3.5 border-b flex items-center justify-between gap-4 ${
+                  isDarkMode ? 'border-slate-800/80 bg-[#0E131F]' : 'border-slate-200 bg-slate-50/70'
+                }`}
+              >
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <BrandLogo size={18} />
+                  <span className="font-display font-semibold">
+                    {activeSessionTitle}
+                  </span>
+                  <span className="text-slate-500" aria-hidden="true">·</span>
+                  <span className="text-slate-400">
+                    {aiLevel === 'Q_PU_9000'
+                      ? 'Q-PU 9000 Series (Kurucu)'
+                      : aiLevel === 'A3_QUANTUM'
+                      ? 'WİFO A3 Quantum'
+                      : aiLevel === 'A2'
+                      ? 'WİFO A2 (Hediye)'
+                      : `WİFO ${aiLevel}`}
+                  </span>
+                  <span className="text-slate-500" aria-hidden="true">·</span>
+                  <span className="text-slate-400">
+                    Ses: <strong className="text-cyan-400">{activeVoicePreset.name.split('·')[0].trim()}</strong>
                   </span>
                 </div>
-                {mode === 'upload' && (
-                  <div className="w-32 h-1 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: "100%" }}
-                      transition={{ duration: 2 }}
-                      className="h-full bg-indigo-600"
-                    />
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-      </main>
 
-      {/* Input Area */}
-      <footer className={cn(
-        "p-4 border-t md:p-6 transition-all duration-500",
-        isDarkMode ? "bg-slate-950 border-slate-800" : "bg-white border-slate-200"
-      )}>
-        <div className="max-w-3xl mx-auto space-y-4">
-          {/* Mode Switcher */}
-          <div className="flex justify-center gap-2">
-            {[
-              { id: 'chat', label: 'Sohbet', icon: MessageSquare },
-              { id: 'image', label: 'Görsel', icon: ImageIcon },
-              { id: 'upload', label: 'Yükleme', icon: FileUp },
-            ].map((m) => (
-              <button
-                key={m.id}
-                onClick={() => setMode(m.id as Mode)}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-xl border transition-all active:scale-95",
-                  mode === m.id 
-                    ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-500/20" 
-                    : (isDarkMode ? "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700" : "bg-slate-50 border-slate-100 text-slate-500 hover:border-slate-200")
-                )}
-              >
-                <m.icon size={14} />
-                <span className="text-[10px] font-black uppercase tracking-tighter">{m.label}</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="relative">
-            {isMuted && (
-              <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-rose-600 text-white text-[10px] font-black px-3 py-1 rounded-full shadow-lg animate-bounce z-10">
-                CEZALISIN: {muteTimer}s
-              </div>
-            )}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={cn(
-                "relative",
-                isMuted ? "opacity-50 grayscale pointer-events-none" : ""
-              )}
-            >
-            <motion.textarea
-              whileFocus={{ scale: 1.01, boxShadow: "0 20px 40px rgba(0,0,0,0.1)" }}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              placeholder={
-                mode === 'chat' ? "Mesajını yaz..." : 
-                mode === 'image' ? "Görseli tarif et..." :
-                "Dosya adını veya analiz sorusunu yaz..."
-              }
-              className={cn(
-                "w-full border rounded-[2rem] px-6 py-5 pr-16 focus:outline-none focus:ring-4 transition-all duration-300 resize-none min-h-[64px] max-h-[200px] font-bold shadow-xl",
-                isDarkMode 
-                  ? "bg-slate-900 border-slate-800 text-white focus:ring-indigo-500/20 focus:border-indigo-500 placeholder-slate-600" 
-                  : "bg-slate-50 border-slate-100 text-slate-800 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder-slate-400"
-              )}
-              rows={1}
-            />
-            
-            <motion.button
-              whileHover={!input.trim() || isLoading ? {} : { scale: 1.1, rotate: 5 }}
-              whileTap={!input.trim() || isLoading ? {} : { scale: 0.9 }}
-              onClick={handleSend}
-              disabled={!input.trim() || isLoading}
-              className={cn(
-                "absolute right-3 bottom-3 p-3 rounded-2xl transition-all duration-500 shadow-xl",
-                !input.trim() || isLoading
-                  ? (isDarkMode ? "bg-slate-800 text-slate-600 shadow-none" : "bg-slate-100 text-slate-300 shadow-none")
-                  : (isPlusActive ? "bg-gradient-to-br " + getPlusThemeClass() + " text-white" : getA1ThemeClass() + " text-white")
-              )}
-            >
-              {isLoading ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
-            </motion.button>
-          </motion.div>
-        </div>
-      </div>
-      <div className="flex flex-col items-center justify-center gap-1 mt-4">
-          <div className="flex items-center gap-2">
-            <div className={cn("w-1.5 h-1.5 rounded-full animate-ping", isFounder ? "bg-yellow-400" : "bg-indigo-500")} />
-            <p className={cn(
-              "text-[10px] font-black uppercase tracking-[0.3em]",
-              isDarkMode ? "text-slate-600" : "text-slate-400"
-            )}>
-              {isFounder ? "WİFO A1 - KURUCU ERİŞİMİ" : "WİFO A1"}
-            </p>
-          </div>
-          <p className="text-[8px] font-bold text-slate-500/50 uppercase tracking-widest">
-            Developed by WİFO Şirketi
-          </p>
-        </div>
-      </footer>
-
-      {/* Onboarding Flow */}
-      <AnimatePresence>
-        {showOnboarding && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/90 backdrop-blur-xl"
-            />
-            
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className={cn(
-                "relative w-full max-w-lg p-8 md:p-12 rounded-[3rem] shadow-2xl border overflow-hidden",
-                isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
-              )}
-            >
-              {/* Progress Bar */}
-              <div className="absolute top-0 left-0 right-0 h-1.5 flex">
-                {ONBOARDING_STEPS.map((_, i) => (
-                  <div 
-                    key={i}
-                    className={cn(
-                      "flex-1 transition-all duration-500",
-                      i <= onboardingStep ? "bg-indigo-600" : "bg-slate-800"
-                    )}
-                  />
-                ))}
-              </div>
-
-              <div className="relative space-y-8">
-                {/* Server Warning */}
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="p-4 rounded-2xl bg-rose-600/10 border border-rose-500/20 flex items-start gap-3"
-                >
-                  <AlertCircle className="text-rose-500 shrink-0 mt-0.5" size={18} />
-                  <p className="text-[10px] font-bold text-rose-500 leading-relaxed uppercase tracking-tighter">
-                    "Bu Yapay Zeka Diğer Yapay Zekalar aksine para almadığı için Sunucularımızı küçültük öğüzden yazma süreniz kısıltılıdır Teşekür ederiz!"
-                  </p>
-                </motion.div>
-
-                <div className="flex justify-between items-start">
-                  <motion.div
-                    key={onboardingStep}
-                    initial={{ scale: 0, rotate: -20 }}
-                    animate={{ scale: 1, rotate: 0 }}
-                    className={cn(
-                      "w-20 h-20 rounded-3xl flex items-center justify-center shadow-2xl",
-                      ONBOARDING_STEPS[onboardingStep].color
-                    )}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowEnergyFlowBar((prev) => !prev)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                      showEnergyFlowBar
+                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                        : isDarkMode
+                        ? 'text-slate-400 hover:text-white hover:bg-slate-800'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                    }`}
+                    title="Kuantum Enerji Çubuğunu Aç / Kapat"
                   >
-                    {(() => {
-                      const Icon = ONBOARDING_STEPS[onboardingStep].icon;
-                      return <Icon className="text-white w-10 h-10" />;
-                    })()}
-                  </motion.div>
-                  <button 
-                    onClick={skipOnboarding}
-                    className="text-xs font-black uppercase tracking-widest text-slate-500 hover:text-indigo-500 transition-colors"
+                    <Zap size={13} />
+                    <span className="hidden sm:inline">
+                      Qubit Enerji: {showEnergyFlowBar ? 'Açık' : 'Kapalı'}
+                    </span>
+                  </button>
+
+                  {speakingId && (
+                    <button
+                      type="button"
+                      onClick={stopSpeaking}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-400 hover:bg-rose-500/25 text-xs font-medium transition-colors whitespace-nowrap"
+                    >
+                      <Square size={11} />
+                      <span>Sesi Durdur</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={exportChatHistory}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      isDarkMode
+                        ? 'text-slate-400 hover:text-white hover:bg-slate-800'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                    }`}
+                    title="Sohbet Geçmişini İndir"
                   >
-                    Atla
+                    <Download size={14} />
+                    <span className="hidden sm:inline">Geçmişi İndir</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={clearChatHistory}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      isDarkMode
+                        ? 'text-slate-400 hover:text-rose-400 hover:bg-slate-800'
+                        : 'text-slate-600 hover:text-rose-600 hover:bg-slate-200/60'
+                    }`}
+                    title="Sohbet Geçmişini Sıfırla"
+                  >
+                    <Trash2 size={14} />
+                    <span className="hidden sm:inline">Temizle</span>
                   </button>
                 </div>
+              </div>
 
-                <motion.div
-                  key={`text-${onboardingStep}`}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="space-y-4"
-                >
-                  <h2 className={cn("text-3xl md:text-4xl font-black italic tracking-tighter", isDarkMode ? "text-white" : "text-slate-900")}>
-                    {ONBOARDING_STEPS[onboardingStep].title}
-                  </h2>
-                  <p className={cn("text-base md:text-lg font-medium leading-relaxed", isDarkMode ? "text-slate-400" : "text-slate-500")}>
-                    {ONBOARDING_STEPS[onboardingStep].desc}
-                  </p>
+              {/* Context-Aware Smart Topics Bar (Drag-and-Drop or 1-Click) */}
+              <SmartTopicsBar
+                messages={messages}
+                isDarkMode={isDarkMode}
+                activeSessionTitle={activeSessionTitle}
+                onSelectTopicPrompt={(promptText, titleText) => {
+                  setActiveSessionTitle(titleText);
+                  submitPrompt(promptText);
+                }}
+                onApplySessionTitle={(titleText) => {
+                  setActiveSessionTitle(titleText);
+                  triggerNotification(
+                    'Akıllı Başlık Uygulandı',
+                    `Sohbet oturumu başlığı "${titleText}" olarak güncellendi.`,
+                    'chat_history',
+                    'info'
+                  );
+                }}
+                onDragStartTopic={(topic) => setDraggedTopic(topic)}
+                onDragEndTopic={() => {
+                  setDraggedTopic(null);
+                  setIsDragOverChat(false);
+                  setIsDragOverInput(false);
+                }}
+              />
 
-                  {onboardingStep === ONBOARDING_STEPS.length - 1 && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3 }}
-                      className={cn(
-                        "w-full p-6 rounded-[2rem] border text-left space-y-4 mt-6",
-                        isDarkMode ? "bg-slate-950/50 border-slate-800" : "bg-slate-50/50 border-slate-100"
-                      )}
+              {/* Message Stream (Also a Drop Zone for Smart Topics) */}
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'copy';
+                  if (!isDragOverChat) setIsDragOverChat(true);
+                }}
+                onDragLeave={() => setIsDragOverChat(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragOverChat(false);
+                  const rawTopic = e.dataTransfer.getData('application/x-funzone-topic');
+                  if (rawTopic) {
+                    try {
+                      const parsed: SmartTopicItem = JSON.parse(rawTopic);
+                      setActiveSessionTitle(parsed.title);
+                      submitPrompt(parsed.prompt);
+                      setDraggedTopic(null);
+                      return;
+                    } catch {
+                      // Fallback to plain text
+                    }
+                  }
+                  const plain = e.dataTransfer.getData('text/plain');
+                  if (plain && plain.trim()) {
+                    submitPrompt(plain.trim());
+                  }
+                  setDraggedTopic(null);
+                }}
+                className={`relative flex-1 overflow-y-auto custom-scrollbar px-4 sm:px-8 py-6 space-y-6 max-h-[540px] min-h-[420px] transition-colors ${
+                  isDragOverChat
+                    ? isDarkMode
+                      ? 'bg-cyan-950/25 ring-2 ring-inset ring-cyan-400/50'
+                      : 'bg-blue-50/70 ring-2 ring-inset ring-blue-400/50'
+                    : ''
+                }`}
+              >
+                {draggedTopic && (
+                  <div
+                    className={`sticky top-0 z-20 p-3 rounded-xl border text-center text-xs font-semibold pointer-events-none transition-all ${
+                      isDragOverChat
+                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200'
+                        : isDarkMode
+                        ? 'bg-slate-900/90 border-slate-700 text-slate-300'
+                        : 'bg-white/90 border-slate-300 text-slate-700'
+                    }`}
+                  >
+                    "{draggedTopic.title}" başlığını buraya bırakarak doğrudan sorabilir veya aşağıdaki mesaj kutusuna bırakıp düzenleyebilirsiniz.
+                  </div>
+                )}
+                {messages.length <= 1 && (
+                  <div className="py-4 mb-2 border-b border-slate-500/10">
+                    <div className="flex items-center gap-3 mb-2">
+                      <BrandLogo size={36} />
+                      <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-cyan-400 via-blue-400 to-violet-400 bg-clip-text text-transparent">
+                        Merhaba {currentUser ? currentUser.name : ''}, nasıl yardımcı olabilirim?
+                      </h1>
+                    </div>
+                    <p className="text-sm text-slate-400 max-w-2xl">
+                      Ses Değiştirici ile asistanın ses karakterini değiştirebilir, mikrofona dokunarak sesli soru sorabilir veya 10 kişilik hediye kodunu kullanabilirsiniz.
+                    </p>
+                  </div>
+                )}
+
+                {messages.map((message) => {
+                  const isUser = message.role === 'user';
+                  const isSpeaking = speakingId === message.id;
+
+                  return (
+                    <div
+                      key={message.id}
+                      className={`flex gap-4 ${isUser ? 'justify-end' : 'justify-start'}`}
                     >
-                      <div className="grid grid-cols-1 gap-1 text-[9px] font-bold uppercase tracking-tighter opacity-60">
-                        <p><span className="text-indigo-500">CODE BY:</span> Sequel Studio</p>
-                        <p><span className="text-indigo-500">UI AND SECURITY:</span> FE STUDIOS</p>
-                        <p><span className="text-indigo-500">BRAIN:</span> WİFO</p>
-                        <p><span className="text-indigo-500">OWNER:</span> WİFO/FE STUDIOS</p>
-                        <p><span className="text-indigo-500">MASTER OWNER:</span> FE HOLDER</p>
-                        <p><span className="text-indigo-500">THEME:</span> WİFO</p>
-                        <p><span className="text-indigo-500">INTERFACE:</span> FE STUDIOS</p>
-                        <p><span className="text-indigo-500">WİFO A2:</span> Sequel Studio</p>
-                        <p><span className="text-indigo-500">WİFO A1,5:</span> FE STUDIOS</p>
-                        <p><span className="text-indigo-500">WİFO A1:</span> FE STUDIOS</p>
-                        <p><span className="text-indigo-500">PLUS FEATURE:</span> WİFO</p>
+                      {!isUser && (
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1">
+                          <BrandLogo size={26} />
+                        </div>
+                      )}
+
+                      <div
+                        className={`max-w-[88%] sm:max-w-[78%] ${
+                          isUser
+                            ? isDarkMode
+                              ? 'bg-[#1E293B] text-slate-100 px-5 py-3.5 rounded-3xl rounded-tr-md'
+                              : 'bg-slate-200/80 text-slate-900 px-5 py-3.5 rounded-3xl rounded-tr-md'
+                            : 'flex-1 min-w-0'
+                        }`}
+                      >
+                        {/* Assistant Metadata Kicker */}
+                        {!isUser && (
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 mb-2">
+                            <span className={`font-display font-semibold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                              {message.botName || 'WİFO A3 QUANTUM'}
+                            </span>
+                            {message.modelTag && (
+                              <>
+                                <span aria-hidden="true">·</span>
+                                <span className="font-mono tabular-nums text-[11px]">{message.modelTag}</span>
+                              </>
+                            )}
+                            <span aria-hidden="true">·</span>
+                            <span className="font-mono tabular-nums text-[11px]">
+                              {new Date(message.timestamp).toLocaleTimeString('tr-TR', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Markdown Content */}
+                        <div
+                          className={`text-[15px] leading-relaxed break-words prose max-w-none ${
+                            isDarkMode ? 'prose-invert' : 'prose-slate'
+                          } prose-p:leading-relaxed prose-pre:rounded-xl prose-pre:border prose-pre:border-slate-800`}
+                        >
+                          <Markdown>{message.content}</Markdown>
+                        </div>
+
+                        {/* Quantum Energy Flow Bar beneath assistant messages */}
+                        {!isUser && showEnergyFlowBar && (
+                          <QuantumEnergyFlowBar
+                            message={message}
+                            isDarkMode={isDarkMode}
+                            isGenerating={regeneratingId === message.id}
+                            activeAiLevel={aiLevel}
+                            onToggleGlobalVisibility={() => setShowEnergyFlowBar(false)}
+                          />
+                        )}
+
+                        {/* Assistant Action Bar (Like, Dislike, Retry, Voice Read, Change Voice & Copy) */}
+                        {!isUser && (
+                          <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-2 border-t border-slate-500/10">
+                            {/* Beğen (Like) */}
+                            <button
+                              type="button"
+                              onClick={() => handleMessageFeedback(message.id, 'like')}
+                              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+                                message.feedback === 'like'
+                                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                  : isDarkMode
+                                  ? 'text-slate-400 hover:text-emerald-400 hover:bg-slate-800/80'
+                                  : 'text-slate-500 hover:text-emerald-600 hover:bg-slate-100'
+                              }`}
+                              title="Yanıtı Beğen"
+                            >
+                              <ThumbsUp size={13} />
+                              <span>{message.feedback === 'like' ? 'Beğenildi' : 'Beğen'}</span>
+                            </button>
+
+                            {/* Beğenme (Dislike) */}
+                            <button
+                              type="button"
+                              onClick={() => handleMessageFeedback(message.id, 'dislike')}
+                              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+                                message.feedback === 'dislike'
+                                  ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                  : isDarkMode
+                                  ? 'text-slate-400 hover:text-rose-400 hover:bg-slate-800/80'
+                                  : 'text-slate-500 hover:text-rose-600 hover:bg-slate-100'
+                              }`}
+                              title="Yanıtı Beğenme"
+                            >
+                              <ThumbsDown size={13} />
+                              <span>{message.feedback === 'dislike' ? 'Beğenilmedi' : 'Beğenme'}</span>
+                            </button>
+
+                            {/* Yeniden Dene (Retry / Regenerate) */}
+                            <button
+                              type="button"
+                              onClick={() => handleRetryMessage(message.id)}
+                              disabled={regeneratingId === message.id || loading}
+                              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors whitespace-nowrap disabled:opacity-50 ${
+                                regeneratingId === message.id
+                                  ? 'bg-blue-500/20 text-blue-400'
+                                  : isDarkMode
+                                  ? 'text-slate-400 hover:text-blue-400 hover:bg-slate-800/80'
+                                  : 'text-slate-500 hover:text-blue-600 hover:bg-slate-100'
+                              }`}
+                              title="Yanıtı Yeniden Üret (Yeniden Dene)"
+                            >
+                              <RotateCcw
+                                size={13}
+                                className={regeneratingId === message.id ? 'animate-spin' : ''}
+                              />
+                              <span>
+                                {regeneratingId === message.id ? 'Yenileniyor...' : 'Yeniden Dene'}
+                              </span>
+                            </button>
+
+                            <span className="text-slate-700 mx-0.5 select-none" aria-hidden="true">|</span>
+
+                            {/* Sesli Dinle */}
+                            <button
+                              type="button"
+                              onClick={() => speakText(message.id, message.content)}
+                              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+                                isSpeaking
+                                  ? 'bg-cyan-500/20 text-cyan-300'
+                                  : isDarkMode
+                                  ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
+                                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+                              }`}
+                              title={isSpeaking ? 'Seslendirmeyi Durdur' : 'Seçili Ses Karakteriyle Dinle'}
+                            >
+                              <Volume2 size={14} />
+                              <span>
+                                {isSpeaking
+                                  ? 'Seslendiriliyor (Durdur)'
+                                  : `Sesli Dinle (${activeVoicePreset.name.split('·')[0].trim()})`}
+                              </span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setIsVoiceModalOpen(true)}
+                              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+                                isDarkMode
+                                  ? 'text-slate-400 hover:text-cyan-300 hover:bg-slate-800/80'
+                                  : 'text-slate-500 hover:text-blue-600 hover:bg-slate-100'
+                              }`}
+                              title="Ses Karakterini Değiştir"
+                            >
+                              <AudioWaveform size={13} />
+                              <span>Ses Değiştir</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleCopyMessage(message.id, message.content)}
+                              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+                                isDarkMode
+                                  ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
+                                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+                              }`}
+                              title="Metni Kopyala"
+                            >
+                              {copiedId === message.id ? (
+                                <>
+                                  <Check size={14} className="text-emerald-400" />
+                                  <span className="text-emerald-400">Kopyalandı</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy size={14} />
+                                  <span>Kopyala</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        )}
                       </div>
-                      <div className="h-px bg-slate-200 dark:bg-slate-800 w-full" />
-                      <div className="grid grid-cols-1 gap-1 text-[9px] font-bold uppercase tracking-tighter opacity-60">
-                        <p><span className="text-indigo-500">Center Supporter:</span> FE HOLDER</p>
-                        <p><span className="text-indigo-500">Software and Brain Development Supporter:</span> Sequel Studio</p>
-                        <p><span className="text-indigo-500">Inspector and Regulator:</span> Sequel Studio</p>
-                        <p><span className="text-indigo-500">Test Team:</span> Sequel Studio</p>
-                        <p><span className="text-indigo-500">Master Developer Team:</span> FE STUDIOS</p>
+
+                      {isUser && (
+                        <div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1 border ${
+                            isDarkMode
+                              ? 'bg-slate-800 border-slate-700 text-slate-300'
+                              : 'bg-slate-100 border-slate-200 text-slate-700'
+                          }`}
+                        >
+                          <User size={15} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {loading && (
+                  <div className="flex flex-col gap-2 max-w-[88%] sm:max-w-[78%]">
+                    <div className="flex items-center gap-4">
+                      <BrandLogo size={26} className="animate-spin" />
+                      <div className="flex items-center gap-2 text-sm text-slate-400">
+                        <RefreshCw size={14} className="animate-spin text-cyan-400" />
+                        <span>
+                          {aiLevel === 'Q_PU_9000'
+                            ? 'Q-PU 9000 Series 4096-Qubit hiper-yanıtı sentezliyor...'
+                            : 'WİFO A3 Quantum yanıtı sentezliyor...'}
+                        </span>
+                      </div>
+                    </div>
+                    {showEnergyFlowBar && (
+                      <div className="pl-10">
+                        <QuantumEnergyFlowBar
+                          isDarkMode={isDarkMode}
+                          isGenerating={true}
+                          activeAiLevel={aiLevel}
+                          onToggleGlobalVisibility={() => setShowEnergyFlowBar(false)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Quantum Analytics Panel (recharts Telemetry Visualization) beneath message history */}
+              <QuantumAnalyticsPanel
+                messages={messages}
+                isDarkMode={isDarkMode}
+                activeAiLevel={aiLevel}
+              />
+
+              {/* Bottom Prompt Composer with Voice Input & Voice Changer Shortcut */}
+              <div
+                className={`p-4 sm:px-6 sm:pb-6 border-t ${
+                  isDarkMode ? 'bg-[#0E131F] border-slate-800/80' : 'bg-slate-50/70 border-slate-200'
+                }`}
+              >
+                {/* Live Voice Recognition Status Bar */}
+                <AnimatePresence>
+                  {isListening && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 6 }}
+                      className={`mb-3 px-4 py-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs ${
+                        isDarkMode
+                          ? 'bg-blue-950/40 border-blue-500/40 text-blue-200'
+                          : 'bg-blue-50 border-blue-200 text-blue-900'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <Mic size={15} className="text-rose-400 shrink-0" />
+                        <span className="font-semibold shrink-0">Mikrofon Dinleniyor:</span>
+                        <span className="truncate italic text-slate-300">
+                          {interimTranscript || 'Lütfen sorunuzu sesli olarak söyleyin...'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        <label className="flex items-center gap-1.5 cursor-pointer text-[11px]">
+                          <input
+                            type="checkbox"
+                            checked={autoSendVoice}
+                            onChange={(e) => setAutoSendVoice(e.target.checked)}
+                            className="rounded border-slate-600"
+                          />
+                          <span>Otomatik Gönder</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={toggleVoiceInput}
+                          className="px-2.5 py-1 rounded-lg bg-rose-500 text-white font-semibold text-[11px]"
+                        >
+                          Bitir
+                        </button>
                       </div>
                     </motion.div>
                   )}
-                </motion.div>
+                </AnimatePresence>
 
-                <div className="flex items-center justify-between pt-4">
-                  <div className="flex gap-1.5">
-                    {ONBOARDING_STEPS.map((_, i) => (
-                      <div 
-                        key={i}
-                        className={cn(
-                          "w-2 h-2 rounded-full transition-all duration-300",
-                          i === onboardingStep ? "w-6 bg-indigo-600" : "bg-slate-700"
-                        )}
-                      />
-                    ))}
-                  </div>
-                  
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={handleNextOnboarding}
-                    className={cn(
-                      "px-8 py-4 text-white rounded-2xl font-black transition-all shadow-xl shadow-indigo-500/20 flex items-center gap-2",
-                      isPlusActive ? "bg-gradient-to-br " + getPlusThemeClass() : getA1ThemeClass()
-                    )}
-                  >
-                    {onboardingStep === ONBOARDING_STEPS.length - 1 ? "Başlayalım" : "Devam Et"}
-                    <Rocket size={18} />
-                  </motion.button>
+                {/* Quick Suggestion Chips */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-3 custom-scrollbar text-xs">
+                  {[
+                    'Kuantum işlemcinin mimarisi nedir?',
+                    'Kurucun kim?',
+                    '10 kişilik hediye kodu ne işe yarar?',
+                    'Python ile kuantum simülatörü kodu yaz',
+                  ].map((preset, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => submitPrompt(preset)}
+                      className={`whitespace-nowrap px-3.5 py-1.5 rounded-xl border transition-colors shrink-0 ${
+                        isDarkMode
+                          ? 'bg-[#161F30] border-slate-800 text-slate-300 hover:border-slate-700 hover:text-white'
+                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
                 </div>
+
+                {/* Rounded Composer Box (Also a Drop Zone for Smart Topics) */}
+                <form
+                  onSubmit={handleSendMessage}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'copy';
+                    if (!isDragOverInput) setIsDragOverInput(true);
+                  }}
+                  onDragLeave={() => setIsDragOverInput(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragOverInput(false);
+                    const rawTopic = e.dataTransfer.getData('application/x-funzone-topic');
+                    if (rawTopic) {
+                      try {
+                        const parsed: SmartTopicItem = JSON.parse(rawTopic);
+                        setActiveSessionTitle(parsed.title);
+                        setInput((prev) => (prev ? `${prev} ${parsed.prompt}` : parsed.prompt));
+                        setDraggedTopic(null);
+                        textareaRef.current?.focus();
+                        return;
+                      } catch {
+                        // Fallback to text/plain
+                      }
+                    }
+                    const plain = e.dataTransfer.getData('text/plain');
+                    if (plain) {
+                      setInput((prev) => (prev ? `${prev} ${plain}` : plain));
+                    }
+                    setDraggedTopic(null);
+                    textareaRef.current?.focus();
+                  }}
+                  className={`flex items-center gap-2 p-2 pl-4 rounded-3xl border transition-colors ${
+                    isDragOverInput
+                      ? 'border-cyan-400 ring-2 ring-cyan-500/30 bg-cyan-950/20'
+                      : isListening
+                      ? 'border-cyan-400 ring-2 ring-cyan-500/20'
+                      : isDarkMode
+                      ? 'bg-[#161F30] border-slate-800 focus-within:border-slate-600'
+                      : 'bg-white border-slate-300 focus-within:border-blue-500 shadow-xs'
+                  }`}
+                >
+                  <textarea
+                    ref={textareaRef}
+                    rows={1}
+                    value={interimTranscript ? `${input}${input ? ' ' : ''}${interimTranscript}` : input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }
+                    }}
+                    placeholder={
+                      isDragOverInput
+                        ? 'Akıllı başlığı buraya bırakarak mesaj kutusuna ekleyin...'
+                        : isListening
+                        ? 'Dinleniyor... Konuşmanız metne dönüştürülüyor'
+                        : 'WİFO A3 Quantum’a bir soru sorun, Sesli Giriş başlatın veya Akıllı Başlık sürükleyin...'
+                    }
+                    className={`flex-1 py-2 text-sm bg-transparent outline-none resize-none ${
+                      isDarkMode ? 'text-white placeholder:text-slate-500' : 'text-slate-900 placeholder:text-slate-400'
+                    }`}
+                  />
+
+                  {/* Voice Changer Studio Shortcut Button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsVoiceModalOpen(true)}
+                    className={`hidden sm:flex items-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+                      isDarkMode
+                        ? 'bg-slate-800/80 hover:bg-slate-700 text-cyan-300'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                    }`}
+                    title="Ses Değiştirme Stüdyosu"
+                  >
+                    <AudioWaveform size={14} />
+                    <span>Ses Değiştir</span>
+                  </button>
+
+                  {/* Voice Input ('Sesli Giriş') Button */}
+                  <button
+                    type="button"
+                    onClick={toggleVoiceInput}
+                    className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
+                      isListening
+                        ? 'bg-rose-500 text-white shadow-sm'
+                        : isDarkMode
+                        ? 'bg-slate-800 hover:bg-slate-700 text-slate-200'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-800'
+                    }`}
+                    title="Mikrofonla Sesli Soru Sor (Sesli Giriş)"
+                  >
+                    {isListening ? <MicOff size={15} /> : <Mic size={15} className="text-cyan-400" />}
+                    <span>{isListening ? 'Dinleniyor...' : 'Sesli Giriş'}</span>
+                  </button>
+
+                  {/* Submit Button */}
+                  <button
+                    type="submit"
+                    disabled={loading || (!input.trim() && !interimTranscript.trim())}
+                    className="p-2.5 rounded-2xl bg-gradient-to-r from-cyan-500 via-blue-600 to-violet-600 text-white hover:opacity-95 transition-opacity disabled:opacity-35 shrink-0"
+                    title="Gönder"
+                  >
+                    <Send size={16} />
+                  </button>
+                </form>
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
+      </main>
+
+      {/* Quiet Editorial Footer */}
+      <footer
+        className={`py-4 border-t text-xs transition-colors ${
+          isDarkMode ? 'border-slate-800/80 text-slate-500 bg-[#0B0F17]' : 'border-slate-200 text-slate-500 bg-white'
+        }`}
+      >
+        <div className="max-w-[1360px] mx-auto px-4 sm:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <BrandLogo size={16} />
+            <span className="font-display font-semibold text-slate-400">Funzone</span>
+            <span aria-hidden="true">·</span>
+            <span>WİFO A3 Quantum & Hediye WİFO A2</span>
+          </div>
+          <div>
+            Kurucu & Geliştirici: <strong className="text-slate-300 font-semibold">FE OWNER BATUHAN</strong>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
 
-
+export default App;

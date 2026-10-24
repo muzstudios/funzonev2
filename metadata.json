@@ -1,5 +1,6 @@
 {
   "name": "Funzone",
-  "description": "Funzone: A multimodal AI playground featuring chat, image generation, and video creation powered by WİFO A1.",
-  "requestFramePermissions": ["camera"]
+  "description": "Funzone: Next-generation multimodal AI powered by WİFO A3 QUANTUM with advanced neural processor, WİFO A2 gift unlock, and 10-user gift code system.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
